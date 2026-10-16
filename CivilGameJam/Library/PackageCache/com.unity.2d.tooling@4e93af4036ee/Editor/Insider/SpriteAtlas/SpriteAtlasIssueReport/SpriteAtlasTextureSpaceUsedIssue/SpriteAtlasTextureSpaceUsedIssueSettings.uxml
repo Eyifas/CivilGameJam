@@ -1,0 +1,10 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements"
+         noNamespaceSchemaLocation="../../../../../../../UIElementsSchema/UIElements.xsd" editor-extension-mode="True">
+    <Style src="./SpriteAtlasTextureSpaceUsedIssueSettings.uss"/>
+    <ui:VisualElement name="Integerfield" class="integerfield">
+        <ui:IntegerField label="Texture Wastage size greater than" value="1" name="size"/>
+        <ui:Label class="unit" text="KB"/>
+    </ui:VisualElement>
+    <ui:VisualElement class="spacer"/>
+    <UnityEditor.U2D.Tooling.Analyzer.UIElement.OKCancel.OKCancelElement/>
+</ui:UXML>

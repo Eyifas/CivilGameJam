@@ -1,0 +1,25 @@
+{
+  "name": "Unity.2D.Tooling.Editor",
+  "rootNamespace": "",
+  "references": [
+    "GUID:343deaaf83e0cee4ca978e7df0b80d21",
+    "GUID:27619889b8ba8c24980f49ee34dbb44a",
+    "GUID:d9ddf4dff5bd43149b7d9ff109f92c69",
+    "GUID:62f0e9ecc477647a6ae5f69b97500692",
+    "GUID:2c573e6b271651846a79655161004c5b",
+    "GUID:ce6baade223984afda3f24c7fca12584",
+    "GUID:d8b63aba1907145bea998dd612889d6b",
+    "GUID:2665a8d13d1b3f18800f46e256720795"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

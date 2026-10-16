@@ -1,0 +1,64 @@
+.report-content {
+    flex: 1 1 0;
+}
+
+SpriteMeshSizeReportSettings {
+    flex: 1 1 0;
+    margin-bottom: 10px;
+    margin-top: 10px;
+    margin-left: 5px;
+}
+
+.apply-revert-container {
+    flex-direction: row;
+    justify-content: flex-end;
+    align-items: center;
+    align-self: flex-end;
+}
+
+IntegerField #unity-text-input {
+    max-width: 50px;
+    min-width: 50px;
+    height: 20px;
+
+}
+
+IntegerField {
+    max-width: 300px;
+    justify-content: space-between;
+}
+
+.spacer {
+    height: 100%;
+    flex: 1 1 0;
+}
+
+#cell {
+    flex: 1 1 0;
+    flex-direction: row;
+    align-items: center;
+    align-content: center;
+    height: 25px;
+    margin-left: 5px;
+}
+
+#icon {
+    background-image: resource('Sprite Icon');
+    flex: 0 0 0;
+    min-width: 16px;
+    min-height: 16px;
+    flex-direction: row;
+    background-color: rgba(0, 0, 0, 0);
+}
+
+.dark #icon {
+    background-image: resource('d_Sprite Icon');
+}
+
+#vertices {
+    margin-left: 5px;
+}
+
+#triangles {
+    margin-left: 5px;
+}

@@ -1,0 +1,1 @@
+{"status":"Valid","reason":"Signature is ok","isLegacy":false,"attestation":{"version":1,"format":"archive","integrity":"sha256-TrRNvAC+oI79J2NrDZ/F/PXaMuupxqVsd+v9pJ2gzI4=","packageName":"com.unity.2d.spriteshape","packageVersion":"16.0.0","publishingChannel":"unity","entitlementKeys":[],"artifactType":"upmPackage"}}

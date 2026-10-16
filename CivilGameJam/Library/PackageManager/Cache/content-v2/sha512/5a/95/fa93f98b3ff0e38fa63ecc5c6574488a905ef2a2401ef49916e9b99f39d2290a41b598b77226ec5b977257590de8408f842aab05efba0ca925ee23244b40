@@ -1,0 +1,1 @@
+{"status":"Valid","reason":"Signature is ok","isLegacy":false,"attestation":{"version":1,"format":"archive","integrity":"sha256-gUEwE5a1ftySsKsdKtz9knvnjgt66G77YwxYRK3lFMw=","packageName":"com.unity.settings-manager","packageVersion":"2.1.1","publishingChannel":"unity","entitlementKeys":[]}}

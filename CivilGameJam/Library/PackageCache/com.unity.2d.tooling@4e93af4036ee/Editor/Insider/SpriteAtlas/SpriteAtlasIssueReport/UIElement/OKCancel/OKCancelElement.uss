@@ -1,0 +1,11 @@
+:root {
+    flex-direction: row;
+}
+
+.ok-button {
+    flex: 1 1 0;
+}
+
+.cancel-button {
+    flex: 1 1 0;
+}

@@ -1,0 +1,13 @@
+/**********************************************************************************************************************/
+/* GenerateGeometryPanel                                                                                          */
+/**********************************************************************************************************************/
+
+#GenerateGeometryPanel.Single #GenerateMultipleSprite {
+  visibility: hidden;
+  height : 0;
+}
+
+#GenerateGeometryPanel.Multiple #GenerateSingleSprite {
+  visibility: hidden;
+  height : 0;
+}

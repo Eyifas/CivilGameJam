@@ -1,0 +1,1 @@
+{"status":"Valid","reason":"Signature is ok","isLegacy":false,"attestation":{"version":1,"format":"archive","integrity":"sha256-LVuw0hV92kIzmdwh24OsyDn2PR1tXsgHBXPfgMJia0A=","packageName":"com.unity.learn.iet-framework","packageVersion":"6.0.7","publishingChannel":"unity","entitlementKeys":[],"artifactType":"upmPackage"}}

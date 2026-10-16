@@ -1,0 +1,8 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements"
+         noNamespaceSchemaLocation="../../../../../../../UIElementsSchema/UIElements.xsd" editor-extension-mode="True">
+    <Style src="./SpriteCountIssueSettings.uss"/>
+    <ui:VisualElement name="SpriteCountIntegerfield" class="sprite-count">
+        <ui:IntegerField label="Sprite Count is less than or equals to" value="1" name="Count"/>
+    </ui:VisualElement>
+    <UnityEditor.U2D.Tooling.Analyzer.UIElement.OKCancel.OKCancelElement/>
+</ui:UXML>

@@ -1,0 +1,1 @@
+{"status":"Valid","reason":"Signature is ok","isLegacy":false,"attestation":{"version":1,"format":"archive","integrity":"sha256-UpsBkE/upZ1pRx8ZX7pXg41tKJL061Q1ByECUeAES1k=","packageName":"com.unity.2d.aseprite","packageVersion":"6.0.0","publishingChannel":"unity","entitlementKeys":[],"artifactType":"upmPackage"}}

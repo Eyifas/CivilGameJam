@@ -1,0 +1,16 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" noNamespaceSchemaLocation="../../../../../../UIElementsSchema/UIElements.xsd" editor-extension-mode="False">
+    <Style src="./DataSourceList.uss" />
+    <ui:VisualElement class="data-source-list-container">
+        <ui:ListView name="DataSourceListView" virtualization-method="DynamicHeight" allow-add="false" allow-remove="false" selection-type="None" class="data-source-list-view" />
+        <ui:VisualElement name ="InfoBox" class="info-box warning">
+            <ui:Image name="InfoIcon" class="info-icon" />
+            <ui:Label text="No data source is enabled. Analyzing will have no effect." class="info-text" />
+        </ui:VisualElement>
+        <ui:Button text="Clear Data" name="ClearDataSourcesButton" class="clear-data-sources-button" tooltip="Clear all data sources data "/>
+        <ui:VisualElement class="data-source-hint-container">
+            <ui:Label name="Hint" text="Control data source collection from a list of paths.&#10;&#10;Use the checkbox to toggle data collection for the individual data source.&#10;&#10;When enabled, you can fine-tune data collection by adding or removing paths." class="data-source-hint" style="white-space: normal;" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+
+
+</ui:UXML>

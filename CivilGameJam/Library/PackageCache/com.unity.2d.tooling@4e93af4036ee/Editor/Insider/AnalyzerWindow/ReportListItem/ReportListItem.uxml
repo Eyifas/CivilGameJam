@@ -1,0 +1,10 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" noNamespaceSchemaLocation="../../../../../../UIElementsSchema/UIElements.xsd"
+         editor-extension-mode="False">
+    <Style src="./ReportListItem.uss"/>
+    <ui:VisualElement name="Root" class="root">
+        <ui:Label text="Label" name="ReportLabel" class="report-label"/>
+        <ui:VisualElement name="ReportCountContainer" class="report-count-container">
+            <ui:Label text="Label" name="ReportCount" class="report-count"/>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

@@ -1,0 +1,6 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" noNamespaceSchemaLocation="../../../../../../UIElementsSchema/UIElements.xsd"
+         editor-extension-mode="False">
+    <Style src="./CellLabelWithIcon.uss"/>
+    <ui:VisualElement name="Icon" class="icon"/>
+    <ui:Label name="Label" class="label"/>
+</ui:UXML>

@@ -1,0 +1,40 @@
+/**********************************************************************************************************************/
+/* PoseToolbar                                                                                                         */
+/**********************************************************************************************************************/
+
+#EditPoseImage {
+    background-image: url("../EditorIcons/Edit_Pose.png");
+}
+
+#ResetPoseImage {
+    background-image: url("../EditorIcons/character_Mode.png");
+}
+
+#SetPivotImage {
+    background-image: url("../EditorIcons/SetPivot.png");
+}
+
+.Dark #EditPoseImage {
+    background-image: url("../EditorIcons/d_Edit_Pose.png");
+}
+
+.Dark #ResetPoseImage {
+    background-image: url("../EditorIcons/d_character_Mode.png");
+}
+
+.Dark #SetPivotImage {
+    background-image: url("../EditorIcons/d_SetPivot.png");
+}
+
+
+.Checked #EditPoseImage{
+    background-image: url("../EditorIcons/Selected/Edit_Pose.png");
+}
+
+.Checked #ResetPoseImage {
+    background-image: url("../EditorIcons/Selected/character_Mode.png");
+}
+
+.Checked #SetPivotImage {
+    background-image: url("../EditorIcons/Selected/SetPivot.png");
+}

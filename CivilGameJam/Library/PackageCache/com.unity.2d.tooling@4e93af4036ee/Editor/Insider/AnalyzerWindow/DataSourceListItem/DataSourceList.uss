@@ -1,0 +1,68 @@
+:root {
+    flex: 1 1 0;
+}
+
+.data-source-list-view {
+    padding-top: 10px;
+}
+
+.data-source-list-item {
+    padding-bottom: 10px;
+}
+
+.data-source-hint-container{
+    margin: 10px;
+    padding-left: 5px;
+    padding-right: 5px;
+    border-width: 1px;
+    border-color: var(--unity-colors-toolbar-border);
+}
+
+.data-source-hint {
+    flex: 1 1 0;
+    margin: 10px;
+}
+
+.info-box {
+    flex-direction: row;
+    align-items: center;
+    padding: 8px;
+    border-radius: 4px;
+    border-width: 1px;
+    margin: 10px 10px 0 10px;
+}
+
+.info-box.warning {
+    background-color: rgba(255, 165, 0, 0.1);
+    border-color: rgba(255, 165, 0, 0.5);
+}
+
+.info-box.error {
+    background-color: rgba(255, 0, 0, 0.1);
+    border-color: rgba(255, 0, 0, 0.5);
+}
+
+.info-box.info {
+    background-color: rgba(0, 123, 255, 0.1);
+    border-color: rgba(0, 123, 255, 0.5);
+}
+
+.info-icon {
+    width: 16px;
+    height: 16px;
+    margin-right: 8px;
+    flex-shrink: 0;
+    background-image: resource("Icons/console.warnicon.png");
+}
+
+.info-text {
+    white-space: normal;
+    flex-grow: 1;
+}
+
+.clear-data-sources-button{
+    margin: 10px;
+    padding-left: 5px;
+    padding-right: 5px;
+    align-self: flex-end;
+}

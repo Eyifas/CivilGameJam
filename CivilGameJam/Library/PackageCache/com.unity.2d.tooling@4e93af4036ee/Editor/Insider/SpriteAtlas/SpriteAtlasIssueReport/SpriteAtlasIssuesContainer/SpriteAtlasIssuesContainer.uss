@@ -1,0 +1,20 @@
+:root {
+    flex: 1 1 0;
+}
+
+.split-view {
+    flex: 1 1 0;
+}
+
+
+.sprite-atlas-list-view {
+    flex: 1 1 0;
+}
+
+.report-list-item-container {
+    flex: 1 1 0;
+}
+
+.right-pane-container {
+    flex: 1 1 0;
+}

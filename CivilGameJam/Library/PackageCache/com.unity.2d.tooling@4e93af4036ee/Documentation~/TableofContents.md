@@ -1,0 +1,8 @@
+* [Introduction to 2D Tooling](index.md)
+* [What's new](WhatsNew.md)
+* [Install and upgrade](Installation.md)
+* [Get started with the Sprite Atlas Analyzer](GetStarted-sprite-atlas-analyzer.md)
+  * [Built-in reports](BuiltInReports.md)
+* [Sprite Atlas Analyzer report samples](Sample.md)
+  * [Sample Sprite Atlas Report](sample-sprite-altas-analyzer-custom-report.md)
+  * [Sample Sprite Data Source and Report](sample-sprite-altas-analyzer-custom-data-source.md)

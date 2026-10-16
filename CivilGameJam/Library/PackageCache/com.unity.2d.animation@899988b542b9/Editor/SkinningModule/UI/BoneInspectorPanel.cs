@@ -1,0 +1,124 @@
+using System;
+using UnityEditor.U2D.Common;
+using UnityEditor.UIElements;
+using UnityEngine;
+using UnityEngine.UIElements;
+
+namespace UnityEditor.U2D.Animation
+{
+#if ENABLE_UXML_SERIALIZED_DATA
+    [UxmlElement]
+#endif
+    internal partial class BoneInspectorPanel : VisualElement
+    {
+        [Flags]
+        internal enum PropertyReadOnly
+        {
+            None,
+            Name = 1,
+            Depth = 1 << 2,
+            Position = 1 << 3,
+            Rotation = 1 << 4,
+            Color = 1 << 5
+        }
+
+#if ENABLE_UXML_TRAITS
+        public class BoneInspectorPanelFactory : UxmlFactory<BoneInspectorPanel, BoneInspectorPanelUxmlTraits> { }
+        public class BoneInspectorPanelUxmlTraits : UxmlTraits { }
+#endif
+
+        public event Action<BoneCache, int> onBoneDepthChanged = (bone, depth) => { };
+        public event Action<BoneCache, Vector2> onBonePositionChanged = (bone, position) => { };
+        public event Action<BoneCache, float> onBoneRotationChanged = (bone, rotation) => { };
+        public event Action<BoneCache, string> onBoneNameChanged = (bone, name) => { };
+        public event Action<BoneCache, Color32> onBoneColorChanged = (bone, color) => { };
+
+        private TextField m_BoneNameField;
+        private IntegerField m_BoneDepthField;
+        private FloatField m_BoneRotationField;
+        private Vector2Field m_BonePositionField;
+        private ColorField m_BoneColorField;
+
+        public string boneName
+        {
+            get { return m_BoneNameField.value; }
+            set { m_BoneNameField.SetValueWithoutNotify(value); }
+        }
+
+        public BoneCache target { get; set; }
+
+        public int boneDepth
+        {
+            get { return m_BoneDepthField.value; }
+            set { m_BoneDepthField.SetValueWithoutNotify(value); }
+        }
+
+        public Vector2 bonePosition
+        {
+            get { return m_BonePositionField.value; }
+            set { m_BonePositionField.SetValueWithoutNotify(value); }
+        }
+
+        public float boneRotation
+        {
+            get { return m_BoneRotationField.value; }
+            set { m_BoneRotationField.SetValueWithoutNotify(value); }
+        }
+
+        public Color32 boneColor
+        {
+            get => m_BoneColorField.value;
+            set { m_BoneColorField.SetValueWithoutNotify(value); }
+        }
+
+        public BoneInspectorPanel()
+        {
+            styleSheets.Add(ResourceLoader.Load<StyleSheet>("SkinningModule/BoneInspectorPanelStyle.uss"));
+
+            RegisterCallback<MouseDownEvent>((e) => { e.StopPropagation(); });
+            RegisterCallback<MouseUpEvent>((e) => { e.StopPropagation(); });
+        }
+
+        public void BindElements()
+        {
+            m_BoneNameField = this.Q<TextField>("BoneNameField");
+            m_BoneDepthField = this.Q<IntegerField>("BoneDepthField");
+            m_BoneRotationField = this.Q<FloatField>("BoneRotationField");
+            m_BonePositionField = this.Q<Vector2Field>("BonePositionField");
+            m_BoneColorField = this.Q<ColorField>("BoneColorField");
+            // Name and Depth are delayed fields: they commit only on Enter / focus-out, not on every keystroke. Like the
+            // other fields they commit through a value-changed callback and are refreshed via SetValueWithoutNotify, so a
+            // model -> UI refresh (e.g. during an Undo/Redo restore) never writes the stale field value back. (UUM-144625)
+            m_BoneNameField.isDelayed = true;
+            m_BoneDepthField.isDelayed = true;
+            m_BoneNameField.RegisterValueChangedCallback(evt => onBoneNameChanged(target, evt.newValue));
+            m_BoneDepthField.RegisterValueChangedCallback(evt => onBoneDepthChanged(target, evt.newValue));
+            m_BoneRotationField.RegisterValueChangedCallback(evt => onBoneRotationChanged(target, evt.newValue));
+            m_BonePositionField.RegisterValueChangedCallback(evt => onBonePositionChanged(target, evt.newValue));
+            m_BoneColorField.RegisterValueChangedCallback(evt => onBoneColorChanged(target, evt.newValue));
+        }
+
+        public void HidePanel()
+        {
+            this.SetHiddenFromLayout(true);
+        }
+        public static BoneInspectorPanel GenerateFromUXML()
+        {
+            VisualTreeAsset visualTree = ResourceLoader.Load<VisualTreeAsset>("SkinningModule/BoneInspectorPanel.uxml");
+            BoneInspectorPanel clone = visualTree.CloneTree().Q<BoneInspectorPanel>("BoneInspectorPanel");
+            clone.LocalizeTextInChildren();
+            clone.BindElements();
+            return clone;
+        }
+
+        public void SetReadOnly(PropertyReadOnly property)
+        {
+            m_BoneDepthField.SetEnabled(!property.HasFlag(PropertyReadOnly.Depth));
+            m_BoneNameField.SetEnabled(!property.HasFlag(PropertyReadOnly.Name));
+            m_BonePositionField.SetEnabled(!property.HasFlag(PropertyReadOnly.Position));
+            m_BoneRotationField.SetEnabled(!property.HasFlag(PropertyReadOnly.Rotation));
+            m_BoneColorField.SetEnabled(!property.HasFlag(PropertyReadOnly.Color));
+        }
+
+    }
+}

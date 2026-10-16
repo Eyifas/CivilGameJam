@@ -1,0 +1,10 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" noNamespaceSchemaLocation="../../../../../../UIElementsSchema/UIElements.xsd"
+         editor-extension-mode="True">
+    <Style src="./DataSourceListItem.uss"/>
+    <ui:Toggle name="DataSourceName" class="data-source-name-toggle" tooltip="Enable or disable data source to update when analyzing."/>
+    <ui:ListView show-foldout-header="true" show-add-remove-footer="true" name="AssetSearchPath"
+                 data-source-type="UnityEditor.U2D.Tooling.Analyzer.DataSourceData, Unity.2D.Tooling.Editor"
+                 data-source-path="assetSearchPath" header-title="Asset Folders" virtualization-method="DynamicHeight"
+                 show-bound-collection-size="false" class="data-source-asset-path-list"
+                 tooltip="Paths to collect data from."/>
+</ui:UXML>

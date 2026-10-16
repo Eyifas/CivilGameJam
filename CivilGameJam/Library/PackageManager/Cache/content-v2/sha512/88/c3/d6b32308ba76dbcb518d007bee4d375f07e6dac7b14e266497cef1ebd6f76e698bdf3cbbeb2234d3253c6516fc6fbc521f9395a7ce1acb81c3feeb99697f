@@ -1,0 +1,1 @@
+{"status":"Valid","reason":"Signature is ok","isLegacy":false,"attestation":{"version":1,"format":"archive","integrity":"sha256-6kqDsgWgU3vDJphAvHgZlPK/qX0Py/LwRzqLL+SQjMU=","packageName":"com.unity.2d.animation","packageVersion":"16.0.1","publishingChannel":"unity","entitlementKeys":[],"artifactType":"upmPackage"}}

@@ -1,0 +1,16 @@
+:root {
+    flex: 1 1 0;
+}
+
+.multi-column-table {
+    flex: 1 1 0;
+}
+
+.unity-multi-column-header__column--sortable {
+    flex-direction: row-reverse;
+}
+
+#unity-multi-column-header-column-title{
+    overflow: hidden;
+    text-overflow: ellipsis;
+}

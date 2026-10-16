@@ -1,0 +1,104 @@
+/* *** General *** */
+
+#CategoriesTab {
+    background-color: var(--unity-colors-default-background);
+    flex-grow: 1;
+    min-height: 0;
+    overflow: hidden;
+    flex-direction: column;
+}
+
+#CategoriesTab > .sprite-library-editor-window__description-text {
+    flex: 1 1 0%;
+    min-height: 0;
+    overflow: hidden;
+}
+
+#CategoriesTab EditorTabHeader {
+    flex-shrink: 0;
+}
+
+.unity-foldout__content {
+    margin-left: 0;
+    flex-grow: 1;
+}
+
+.unity-list-view__empty-label {
+    display: none;
+}
+
+.unity-foldout__toggle {
+    background-color: var(--unity-colors-window-background);
+    padding-left: 3px;
+    padding-top: 3px;
+    padding-bottom: 2px;
+    margin: 0;
+}
+
+.unity-toggle__text {
+    height: 20px;
+    font-size: 12px;
+    -unity-font-style: bold;
+}
+
+.sprite-library-editor-window__category-list-text {
+    margin-left: 10px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sprite-library-editor-window__category-list-item {
+    justify-content: center;
+}
+
+.sprite-library-editor-window__category-container {
+    color: lightgray;
+    -unity-font-style: bold;
+}
+
+.sprite-library-editor-window__category-label-container {
+    flex-direction: row;
+}
+
+.sprite-library-editor-window__category-list-container {
+    flex-grow: 1;
+    flex-shrink: 1;
+}
+
+/*
+    Override .unity-foldout__toggle
+        padding-top: 3px -> 2px
+        padding-bottom: 2px -> 3px
+*/
+#LocalFoldout > Toggle, #InheritedFoldout > Toggle {
+    padding-top: 2px;
+    padding-bottom: 3px;
+}
+
+/*
+    Override .unity-toggle__text
+        height: 20px -> auto
+*/
+#LocalFoldout > Toggle Label, #InheritedFoldout > Toggle Label {
+    height: auto;
+}
+
+#LocalLabel {
+    padding: 5px;
+    background-color: var(--unity-colors-default-background);
+}
+
+#InheritedLabel {
+    padding: 5px;
+    background-color: var(--unity-colors-default-background);
+}
+
+#CategoryListsScrollView {
+    flex-grow: 1;
+    min-height: 0;
+}
+
+#CategoryListsContainer {
+    flex-grow: 1;
+    justify-content: flex-start;
+}

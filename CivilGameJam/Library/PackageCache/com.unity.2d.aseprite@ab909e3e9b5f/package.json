@@ -1,0 +1,36 @@
+{
+  "name": "com.unity.2d.aseprite",
+  "version": "6.0.0",
+  "unity": "6000.6",
+  "unityRelease": "0a6",
+  "displayName": "2D Aseprite Importer",
+  "description": "2D Aseprite Importer is a package which enables the import of .aseprite files from the Pixel Art tool Aseprite.",
+  "keywords": [
+    "2d",
+    "Aseprite",
+    "Pixel",
+    "Art",
+    "assetimporter"
+  ],
+  "category": "2D",
+  "dependencies": {
+    "com.unity.2d.sprite": "1.0.0",
+    "com.unity.2d.tilemap": "1.0.0",
+    "com.unity.2d.common": "15.0.0",
+    "com.unity.mathematics": "1.2.6",
+    "com.unity.modules.animation": "1.0.0"
+  },
+  "relatedPackages": {
+    "com.unity.2d.aseprite.tests": "6.0.0"
+  },
+  "repository": {
+    "revision": "95ca1e06e087c19485fddeea307c483cc0e137da",
+    "type": "git",
+    "url": "https://github.cds.internal.unity3d.com/unity/2d.git"
+  },
+  "documentationUrl": "https://docs.unity3d.com/Packages/com.unity.2d.aseprite@6.0/manual/index.html",
+  "_upm": {
+    "changelog": "### Fixed\n- Fixed an issue where you could not change an Aseprite file containing tile data to AnimatedSprite import mode. (UUM-135150)"
+  },
+  "_fingerprint": "ab909e3e9b5fc0499b261a0c86d0c633a37f3931"
+}

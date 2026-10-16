@@ -1,0 +1,8 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements"
+         noNamespaceSchemaLocation="../../../../../../../UIElementsSchema/UIElements.xsd" editor-extension-mode="True">
+    <Style src="./AtlasPageReportSettings.uss"/>
+    <ui:VisualElement name="AtlasPageIntegerfield" class="atlas-page">
+        <ui:IntegerField label="Altas with pages greater than" value="1" name="AtlasPages"/>
+    </ui:VisualElement>
+    <UnityEditor.U2D.Tooling.Analyzer.UIElement.OKCancel.OKCancelElement/>
+</ui:UXML>

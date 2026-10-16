@@ -1,0 +1,37 @@
+{
+  "name": "com.unity.2d.tooling",
+  "displayName": "2D Tooling",
+  "version": "4.0.1",
+  "unity": "6000.6",
+  "unityRelease": "0a1",
+  "description": "A Unity Editor tool to analyze Sprite Atlases usage.",
+  "dependencies": {
+    "com.unity.2d.common": "15.0.0"
+  },
+  "relatedPackages": {
+    "com.unity.2d.common.tests": "15.0.0",
+    "com.unity.2d.tooling.tests": "4.0.1"
+  },
+  "samples": [
+    {
+      "displayName": "Sample Sprite Atlas Report",
+      "description": "Sample Sprite Atlas report that shows how to use the Sprite Atlas data source to create a report. Note that this sample uses the internal APIs from the package which are subject to change.",
+      "path": "Samples~/Sample Sprite Atlas Report"
+    },
+    {
+      "displayName": "Sample Sprite Data source And Report",
+      "description": "Sample custom data source and report implementation.",
+      "path": "Samples~/Sample Sprite Data source And Report"
+    }
+  ],
+  "repository": {
+    "revision": "72c620dc8c96ad4620a18b1795884f670b7f5794",
+    "type": "git",
+    "url": "https://github.cds.internal.unity3d.com/unity/2d.git"
+  },
+  "documentationUrl": "https://docs.unity3d.com/Packages/com.unity.2d.tooling@4.0/manual/index.html",
+  "_upm": {
+    "changelog": "### Fixed\n- Improved report generation speed.\n- Inform user if there are reports that are still generating when 'Analyze' button is clicked.\n- Fixed warning when analyzing during play mode. (UUM-141203)"
+  },
+  "_fingerprint": "4e93af4036eea692dc0254a16e5868baa132a7ab"
+}

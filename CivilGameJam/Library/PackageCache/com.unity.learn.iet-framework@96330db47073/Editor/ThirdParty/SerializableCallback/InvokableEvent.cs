@@ -1,0 +1,189 @@
+using System;
+
+namespace SerializableCallback
+{
+    public class InvokableEvent : InvokableEventBase
+    {
+        public Action action;
+
+        public void Invoke()
+        {
+            action();
+        }
+
+        /// <param name="args"></param>
+        public override void Invoke(params object[] args)
+        {
+            action();
+        }
+
+        /// <summary>
+        /// Constructor
+        /// </summary>
+        /// <param name="target"></param>
+        /// <param name="methodName"></param>
+        public InvokableEvent(object target, string methodName)
+        {
+            if (target == null || string.IsNullOrEmpty(methodName))
+            {
+                action = () => {};
+            }
+            else
+            {
+                action = (Action)Delegate.CreateDelegate(typeof(Action), target, methodName);
+            }
+        }
+    }
+
+    /// <typeparam name="T0"></typeparam>
+    public class InvokableEvent<T0> : InvokableEventBase
+    {
+        public Action<T0> action;
+
+        /// <param name="arg0"></param>
+        public void Invoke(T0 arg0)
+        {
+            action(arg0);
+        }
+
+        /// <param name="args"></param>
+        public override void Invoke(params object[] args)
+        {
+            action((T0)args[0]);
+        }
+
+        /// <summary>
+        /// Constructor
+        /// </summary>
+        /// <param name="target"></param>
+        /// <param name="methodName"></param>
+        public InvokableEvent(object target, string methodName)
+        {
+            if (target == null || string.IsNullOrEmpty(methodName))
+            {
+                action = x => {};
+            }
+            else
+            {
+                action = (Action<T0>)Delegate.CreateDelegate(typeof(Action<T0>), target, methodName);
+            }
+        }
+    }
+
+    /// <typeparam name="T0"></typeparam>
+    /// <typeparam name="T1"></typeparam>
+    public class InvokableEvent<T0, T1> : InvokableEventBase
+    {
+        public Action<T0, T1> action;
+
+        /// <param name="arg0"></param>
+        /// <param name="arg1"></param>
+        public void Invoke(T0 arg0, T1 arg1)
+        {
+            action(arg0, arg1);
+        }
+
+        /// <param name="args"></param>
+        public override void Invoke(params object[] args)
+        {
+            action((T0)args[0], (T1)args[1]);
+        }
+
+        /// <summary>
+        /// Constructor
+        /// </summary>
+        /// <param name="target"></param>
+        /// <param name="methodName"></param>
+        public InvokableEvent(object target, string methodName)
+        {
+            if (target == null || string.IsNullOrEmpty(methodName))
+            {
+                action = (x, y) => {};
+            }
+            else
+            {
+                action = (Action<T0, T1>)Delegate.CreateDelegate(typeof(Action<T0, T1>), target, methodName);
+            }
+        }
+    }
+
+    /// <typeparam name="T0"></typeparam>
+    /// <typeparam name="T1"></typeparam>
+    /// <typeparam name="T2"></typeparam>
+    public class InvokableEvent<T0, T1, T2> : InvokableEventBase
+    {
+        public Action<T0, T1, T2> action;
+
+        /// <param name="arg0"></param>
+        /// <param name="arg1"></param>
+        /// <param name="arg2"></param>
+        public void Invoke(T0 arg0, T1 arg1, T2 arg2)
+        {
+            action(arg0, arg1, arg2);
+        }
+
+        /// <param name="args"></param>
+        public override void Invoke(params object[] args)
+        {
+            action((T0)args[0], (T1)args[1], (T2)args[2]);
+        }
+
+        /// <summary>
+        /// Constructor
+        /// </summary>
+        /// <param name="target"></param>
+        /// <param name="methodName"></param>
+        public InvokableEvent(object target, string methodName)
+        {
+            if (target == null || string.IsNullOrEmpty(methodName))
+            {
+                action = (x, y, z) => {};
+            }
+            else
+            {
+                action = (Action<T0, T1, T2>)Delegate.CreateDelegate(typeof(Action<T0, T1, T2>), target, methodName);
+            }
+        }
+    }
+
+    /// <typeparam name="T0"></typeparam>
+    /// <typeparam name="T1"></typeparam>
+    /// <typeparam name="T2"></typeparam>
+    /// <typeparam name="T3"></typeparam>
+    public class InvokableEvent<T0, T1, T2, T3> : InvokableEventBase
+    {
+        public Action<T0, T1, T2, T3> action;
+
+        /// <param name="arg0"></param>
+        /// <param name="arg1"></param>
+        /// <param name="arg2"></param>
+        /// <param name="arg3"></param>
+        public void Invoke(T0 arg0, T1 arg1, T2 arg2, T3 arg3)
+        {
+            action(arg0, arg1, arg2, arg3);
+        }
+
+        /// <param name="args"></param>
+        public override void Invoke(params object[] args)
+        {
+            action((T0)args[0], (T1)args[1], (T2)args[2], (T3)args[3]);
+        }
+
+        /// <summary>
+        /// Constructor
+        /// </summary>
+        /// <param name="target"></param>
+        /// <param name="methodName"></param>
+        public InvokableEvent(object target, string methodName)
+        {
+            if (target == null || string.IsNullOrEmpty(methodName))
+            {
+                action = (x, y, z, w) => {};
+            }
+            else
+            {
+                action = (Action<T0, T1, T2, T3>)Delegate.CreateDelegate(typeof(Action<T0, T1, T2, T3>), target, methodName);
+            }
+        }
+    }
+}

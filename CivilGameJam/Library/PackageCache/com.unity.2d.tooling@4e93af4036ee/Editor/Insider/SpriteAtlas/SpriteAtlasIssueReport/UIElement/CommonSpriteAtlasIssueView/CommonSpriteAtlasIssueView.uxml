@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ui:UXML
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:ui="UnityEngine.UIElements"
+    xsi:noNamespaceSchemaLocation="../../../../../../../UIElementsSchema/UIElements.xsd"
+>
+    <Style src="./CommonSpriteAtlasIssueView.uss"/>
+    <Style
+        src="project://database/Packages/com.unity.2d.tooling/Editor/Insider/SpriteAtlas/SpriteAtlasIssueReport/UIElement/StyleSheet/Icon.uss"/>
+    <UnityEditor.U2D.Tooling.Analyzer.UIElement.SpriteAtlasReportTable name="ReportTable" class="report-table-item"/>
+    <ui:Label name="NoDataLabel" class="no-data-label" text="No issues found"/>
+</ui:UXML>

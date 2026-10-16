@@ -1,0 +1,1 @@
+{"status":"Valid","reason":"Signature is ok","isLegacy":false,"attestation":{"version":1,"format":"archive","integrity":"sha256-qMtXa2hd+lszQL2TYPpCuVifQ0A96KE7FuctIp9EYPw=","packageName":"com.unity.2d.tilemap.extras","packageVersion":"9.0.1","publishingChannel":"unity","entitlementKeys":[],"artifactType":"upmPackage"}}

@@ -1,0 +1,7 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" noNamespaceSchemaLocation="../../../../../UIElementsSchema/UIElements.xsd"
+         editor-extension-mode="False">
+    <Style
+        src="./SpriteAtlasIssuesContainer.uss"/>
+    <ui:TreeView name="TreeView" virtualization-method="DynamicHeight" show-alternating-row-backgrounds="ContentOnly"
+                 reorderable="true"/>
+</ui:UXML>

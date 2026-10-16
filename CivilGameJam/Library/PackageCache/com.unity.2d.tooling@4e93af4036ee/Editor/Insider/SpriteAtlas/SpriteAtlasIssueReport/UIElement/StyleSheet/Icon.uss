@@ -1,0 +1,30 @@
+.icon {
+    max-width: 16px;
+    max-height: 16px;
+    min-width: 16px;
+    min-height: 16px;
+}
+
+.texture-icon {
+    background-image: resource('Texture Icon');
+}
+
+.dark .texture-icon {
+    background-image: resource('d_Texture Icon');
+}
+
+.sprite-icon {
+    background-image: resource('Sprite Icon');
+}
+
+.dark .sprite-icon {
+    background-image: resource('d_Sprite Icon');
+}
+
+.dark .spriteatlas-icon {
+    background-image: resource('SpriteAtlasAsset Icon');
+}
+
+.dark .spriteatlas-icon {
+    background-image: resource('d_SpriteAtlasAsset Icon');
+}

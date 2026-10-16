@@ -1,0 +1,1 @@
+{"status":"Valid","reason":"Signature is ok","isLegacy":false,"attestation":{"version":1,"format":"archive","integrity":"sha256-uuCCRCsdCu5n9m7PYp3vCRAoVg1SG2W0DXZz5lSQmyw=","packageName":"com.unity.2d.psdimporter","packageVersion":"15.0.1","publishingChannel":"unity","entitlementKeys":[],"artifactType":"upmPackage"}}

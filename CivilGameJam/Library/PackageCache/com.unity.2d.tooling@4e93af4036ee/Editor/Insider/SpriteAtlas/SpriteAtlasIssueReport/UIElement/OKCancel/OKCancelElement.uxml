@@ -1,0 +1,5 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <Style src="./OKCancelElement.uss"/>
+    <ui:Button text="Cancel" name="Cancel" class="cancel-button"/>
+    <ui:Button text="OK" name="OK" class="ok-button"/>
+</ui:UXML>

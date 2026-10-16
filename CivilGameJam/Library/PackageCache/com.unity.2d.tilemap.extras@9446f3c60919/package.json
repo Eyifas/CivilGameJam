@@ -1,0 +1,51 @@
+{
+  "name": "com.unity.2d.tilemap.extras",
+  "displayName": "2D Tilemap Extras",
+  "version": "9.0.1",
+  "unity": "6000.6",
+  "description": "2D Tilemap Extras is a package that contains extra scripts for use with 2D Tilemap features in Unity. These include custom Tiles and Brushes for the Tilemap feature.\n\nThe following are included in the package:\nBrushes: GameObject Brush, Group Brush, Line Brush, Random Brush\nTiles: Animated Tile, Auto Tile, Rule Tile, Rule Override Tile\nOther: Grid Information, Custom Rules for Rule Tile",
+  "keywords": [
+    "2d"
+  ],
+  "category": "2D",
+  "dependencies": {
+    "com.unity.modules.tilemap": "1.0.0",
+    "com.unity.2d.tilemap": "1.0.0",
+    "com.unity.modules.jsonserialize": "1.0.0"
+  },
+  "relatedPackages": {
+    "com.unity.2d.tilemap.extras.tests": "9.0.1"
+  },
+  "samples": [
+    {
+      "displayName": "Waterfall Animated Tile",
+      "description": "An example implementation of an Animated Tile.",
+      "path": "Samples~/WaterfallAnimatedTile"
+    },
+    {
+      "displayName": "Pipe Rule Tile",
+      "description": "An example implementation of a Rule Tile with rules matching four-way orthogonal neighbors.",
+      "path": "Samples~/PipeRuleTile"
+    },
+    {
+      "displayName": "Dungeon Rule Tile",
+      "description": "An example implementation of a Rule Tile with rules matching eight-way orthogonal and diagonal neighbors.",
+      "path": "Samples~/DungeonRuleTile"
+    },
+    {
+      "displayName": "Auto Tile (3x3)",
+      "description": "An example implementation of Auto Tiles with 3x3 mask and a template.",
+      "path": "Samples~/AutoTile3"
+    }
+  ],
+  "repository": {
+    "revision": "72c620dc8c96ad4620a18b1795884f670b7f5794",
+    "type": "git",
+    "url": "https://github.cds.internal.unity3d.com/unity/2d.git"
+  },
+  "documentationUrl": "https://docs.unity3d.com/Packages/com.unity.2d.tilemap.extras@9.0/manual/index.html",
+  "_upm": {
+    "changelog": "### Added\n- [AutoTileEditor] Add asset preview for AutoTile\n\n### Fixed\n- [GameObjectBrush] Only destroy HideAndDontSave objects set in GameObjectBrush for GameObjectBrush.Reset\n\n### Changed\n- [AutoTileEditor] Limit number of textures for AutoTile to 0-1000\n- [AdvancedRuleOverrideTileEditor] Add scrolling to Rules\n- [GameObjectBrush] Set minimum of each size element to 1\n- [RandomBrushEditor] Cap each random Set Size element to 100 and total size to 10000\n- [RandomBrushEditor] Add dialog box to confirm changes if total Tile count exceeds 100000\n- [RandomBrushEditor] Set minimum of Number of Sets to 1\n- [RuleTile] Optimise GetTileAnimationData to skip rule matching when no TilingRule has Animation output.\n- [RuleTile] Fix matching for GetTileAnimationData to stop at exact rule matched."
+  },
+  "_fingerprint": "9446f3c609197cd7907ef77556c62aa26a909b11"
+}

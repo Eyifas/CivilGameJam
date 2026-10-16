@@ -1,0 +1,20 @@
+:root {
+    flex: 1 1 0;
+    margin-top: 10px;
+    margin-bottom: 10px;
+    margin-right: 5px;
+    margin-left: 5px;
+}
+
+.sprite-count {
+    flex-grow: 1;
+}
+
+OKCancelElement {
+    align-self: flex-end;
+}
+
+.sprite-count #unity-text-input {
+    max-width: 25px;
+    min-width: 25px;
+}

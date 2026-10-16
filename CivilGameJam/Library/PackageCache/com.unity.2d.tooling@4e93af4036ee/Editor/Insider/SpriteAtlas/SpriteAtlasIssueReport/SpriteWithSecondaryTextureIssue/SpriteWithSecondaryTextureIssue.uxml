@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ui:UXML
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:ui="UnityEngine.UIElements"
+    xsi:noNamespaceSchemaLocation="../../../../../../../UIElementsSchema/UIElements.xsd"
+>
+    <Style src="./SpriteWithSecondaryTextureIssue.uss"/>
+    <Style
+        src="project://database/Packages/com.unity.2d.tooling/Editor/Insider/SpriteAtlas/SpriteAtlasIssueReport/UIElement/StyleSheet/Icon.uss"/>
+    <ui:MultiColumnTreeView name="Table" show-alternating-row-backgrounds="ContentOnly" auto-expand="false" class="table">
+        <ui:Columns primary-column-name="Name">
+            <ui:Column name="Name" title="Name" binding-path="name" width="80px"/>
+            <ui:Column name="Count" title="Count" binding-path="count" width="80px"/>
+        </ui:Columns>
+    </ui:MultiColumnTreeView>
+    <ui:Label name="NoDataLabel" class="no-data-label" text="No issues found"/>
+</ui:UXML>
