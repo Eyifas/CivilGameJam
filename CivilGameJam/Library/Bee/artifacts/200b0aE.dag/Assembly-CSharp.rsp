@@ -529,6 +529,7 @@
 -analyzer:"/Users/safiyedemirtas/Desktop/Programlar/6000.6.5f1/Unity.app/Contents/Resources/Scripting/BCLExtensions/TargetingPacks/netstandard2.1/analyzers/dotnet/roslyn4.0/cs/Microsoft.Extensions.Logging.Generators.dll"
 -analyzer:"/Users/safiyedemirtas/Desktop/Programlar/6000.6.5f1/Unity.app/Contents/Resources/Scripting/BCLExtensions/TargetingPacks/netstandard2.1/analyzers/dotnet/roslyn4.0/cs/System.Text.Json.SourceGeneration.dll"
 "Assets/MainScene/Script/FirstTime.cs"
+"Assets/MainScene/Script/InteractionZone.cs"
 "Assets/MainScene/Script/PlayerMovement.cs"
 "Assets/MainScene/Script/RoomCamera.cs"
 -langversion:9.0

@@ -5,21 +5,26 @@ public class FirstTime : MonoBehaviour
 {
     [SerializeField] private float firstTime = 90f;
     [SerializeField] private TMP_Text timerText;
+    [SerializeField] private RoomCamera roomCamera;
 
     private bool timeEnded = false;
 
     private void Update()
     {
-        if (firstTime > 0f)
+        if (!timeEnded)
         {
             firstTime -= Time.unscaledDeltaTime;
             firstTime = Mathf.Max(0f, firstTime);
-        }
-        else
-        {
-            if (!timeEnded)
+
+            if (firstTime <= 0f)
             {
                 timeEnded = true;
+
+                if (roomCamera != null)
+                {
+                    roomCamera.StartEarthquake();
+                }
+
                 Debug.Log("Süre bitti!");
             }
         }
@@ -28,6 +33,10 @@ public class FirstTime : MonoBehaviour
         int minutes = totalSeconds / 60;
         int seconds = totalSeconds % 60;
 
-        timerText.text = minutes.ToString("00") + ":" + seconds.ToString("00");
+        if (timerText != null)
+        {
+            timerText.text =
+                minutes.ToString("00") + ":" + seconds.ToString("00");
+        }
     }
 }
