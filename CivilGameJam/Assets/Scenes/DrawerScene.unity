@@ -811,7 +811,7 @@ MonoBehaviour:
   rightOpenSprite: {fileID: 21300000, guid: 90f8177da64554ea2995ae73d80ec0ec, type: 3}
   bothOpenSprite: {fileID: 21300000, guid: 5dca728d568304fdc9459d0dcb03a363, type: 3}
   hammerObject: {fileID: 1667124545}
-  vidaObject: {fileID: 0}
+  vidaObject: {fileID: 522542461}
 --- !u!1 &1388828952
 GameObject:
   m_ObjectHideFlags: 0
