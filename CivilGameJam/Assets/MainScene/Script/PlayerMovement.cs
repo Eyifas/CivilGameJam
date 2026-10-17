@@ -20,18 +20,19 @@ public class PlayerMovement : MonoBehaviour
     [Header("Flashlight")]
     [SerializeField] private Transform flashlightLight;
     [SerializeField] private Light2D flashlightBeam;
+    [Tooltip("Flashlight local offset relative to character (X will flip when facing left)")]
     [SerializeField] private Vector2 flashlightOffset = new Vector2(0.18f, 0.05f);
     [SerializeField] private float smoothFollowSpeed = 12f;
 
-    [Header("Character Lighting (Half Visible)")]
+    [Header("Character Small Light")]
     [SerializeField] private Light2D characterLight;
-    [Range(0f, 1f)]
-    [SerializeField] private float characterHalfIntensity = 0.45f;
-    [SerializeField] private float characterLightRadius = 3.2f;
+    [SerializeField] private float characterLightIntensity = 0.45f;
+    [SerializeField] private float characterLightRadius = 3f;
+    [SerializeField] private Vector2 characterLightOffset = new Vector2(0f, 0.05f);
+    [SerializeField] private Color characterLightColor = new Color(1f, 0.992f, 0.91f, 1f);
 
     private Vector2 movement;
     private float targetFacingAngle = -90f;
-    private Light2D cachedGlobalLight;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetStaticData()
@@ -45,11 +46,15 @@ public class PlayerMovement : MonoBehaviour
         {
             defaultSpawnPosition.y = -2.2f;
         }
+
+        if (characterLight != null)
+        {
+            characterLight.transform.localPosition = new Vector3(characterLightOffset.x, characterLightOffset.y, 0f);
+        }
     }
 
     private void Awake()
     {
-        // Inspector'dan bağlamadıysan otomatik bulmaya çalış
         if (spriteRenderer == null)
         {
             spriteRenderer = GetComponentInChildren<SpriteRenderer>();
@@ -60,9 +65,10 @@ public class PlayerMovement : MonoBehaviour
             animator = GetComponentInChildren<Animator>();
         }
 
-        EnsureLighting();
+        EnsureFlashlight();
+        EnsureCharacterLight();
+        ResetFlashlight();
 
-        // Önceden kaydedilmiş konum varsa oradan başla
         if (LastSavedPosition.HasValue)
         {
             transform.position = LastSavedPosition.Value;
@@ -81,12 +87,13 @@ public class PlayerMovement : MonoBehaviour
 
     private void Start()
     {
-        EnsureLighting();
+        EnsureFlashlight();
+        EnsureCharacterLight();
+        ResetFlashlight();
     }
 
-    private void EnsureLighting()
+    private void EnsureFlashlight()
     {
-        // Auto-find flashlight transform and beam
         if (flashlightLight == null)
         {
             Transform found = transform.Find("FlashlightLight");
@@ -101,51 +108,78 @@ public class PlayerMovement : MonoBehaviour
             flashlightBeam = flashlightLight.GetComponent<Light2D>();
         }
 
-        // Configure flashlight beam parameters for high visual quality
-        if (flashlightBeam != null)
-        {
-            flashlightBeam.shadowsEnabled = false;
-            flashlightBeam.pointLightInnerAngle = 45f;
-            flashlightBeam.pointLightOuterAngle = 75f;
-            flashlightBeam.pointLightInnerRadius = 0.6f;
-            if (flashlightBeam.pointLightOuterRadius < 5f)
-            {
-                flashlightBeam.pointLightOuterRadius = 9.5f;
-            }
-        }
+        // NOTE: flashlightBeam üzerindeki tüm açı, yarıçap, renk, gölge ayarları
+        // Unity Inspector'da nasıl ayarlandıysa aynen kullanılır, koddan ezilmez.
+    }
 
-        // Auto-find or create character half-visible light
+    private void EnsureCharacterLight()
+    {
         if (characterLight == null)
         {
-            Transform foundCharLight = transform.Find("CharacterLight");
-            if (foundCharLight != null)
+            Transform found = transform.Find("CharacterLight");
+            if (found != null)
             {
-                characterLight = foundCharLight.GetComponent<Light2D>();
+                characterLight = found.GetComponent<Light2D>();
             }
         }
 
+        // Eğer Inspector'da atanmamışsa ve sahnede yoksa karakter üzerinde küçük ışık oluştur
         if (characterLight == null)
         {
             GameObject charLightObj = new GameObject("CharacterLight");
             charLightObj.transform.SetParent(transform, false);
-            charLightObj.transform.localPosition = new Vector3(0f, 0.05f, 0f);
+            charLightObj.transform.localPosition = new Vector3(characterLightOffset.x, characterLightOffset.y, 0f);
             characterLight = charLightObj.AddComponent<Light2D>();
-            characterLight.lightType = Light2D.LightType.Point;
-            characterLight.pointLightInnerAngle = 360f;
-            characterLight.pointLightOuterAngle = 360f;
-            characterLight.pointLightInnerRadius = 0.6f;
-            characterLight.pointLightOuterRadius = characterLightRadius;
-            characterLight.intensity = characterHalfIntensity;
-            characterLight.shadowsEnabled = false;
-            characterLight.color = new Color(1f, 0.96f, 0.88f, 1f);
+            ApplyScreenshotSettingsToLight(characterLight);
         }
         else
         {
-            characterLight.lightType = Light2D.LightType.Point;
-            characterLight.pointLightInnerAngle = 360f;
-            characterLight.pointLightOuterAngle = 360f;
-            characterLight.pointLightOuterRadius = characterLightRadius;
-            characterLight.shadowsEnabled = false;
+            // Inspector'dan atanan veya hiyerarşide bulunan ışığın konumunu koru
+            characterLight.transform.localPosition = new Vector3(characterLightOffset.x, characterLightOffset.y, 0f);
+            characterLight.enabled = true;
+        }
+    }
+
+    private void ApplyScreenshotSettingsToLight(Light2D light)
+    {
+        if (light == null) return;
+        // User Screenshot 2026-10-17 161420 Settings:
+        // Light Type: Spot (360/360 point spot)
+        // Radius: Inner 0, Outer 3
+        // Inner/Outer Angle: 360 / 360
+        // Falloff Strength: 0.5
+        // Blend Style: Multiply (index 0)
+        // Overlap Operation: Additive
+        // Light Order: 0
+        // Intensity: 0.45
+        // Shadows: Off
+        // Volumetric: Off
+        light.lightType = Light2D.LightType.Point;
+        light.pointLightInnerAngle = 360f;
+        light.pointLightOuterAngle = 360f;
+        light.pointLightInnerRadius = 0f;
+        light.pointLightOuterRadius = characterLightRadius;
+        light.falloffIntensity = 0.5f;
+        light.blendStyleIndex = 0; // Multiply
+        light.overlapOperation = Light2D.OverlapOperation.Additive;
+        light.lightOrder = 0;
+        light.intensity = characterLightIntensity;
+        light.shadowsEnabled = false;
+        light.volumetricEnabled = false;
+        light.color = characterLightColor;
+        light.enabled = true;
+    }
+
+    public void ResetFlashlight()
+    {
+        if (flashlightBeam != null)
+        {
+            flashlightBeam.enabled = false;
+        }
+
+        if (flashlightLight != null)
+        {
+            flashlightLight.gameObject.SetActive(false);
         }
     }
 
@@ -173,8 +207,11 @@ public class PlayerMovement : MonoBehaviour
         // Sağa / sola dönme ve fener takibi
         UpdateFacingAndFlashlight();
 
-        // Karakterin karanlıkta yarım görünür kalmasını sağla
-        UpdateCharacterVisibility();
+        // Karakterin kendi üzerindeki küçük ışık (karanlıkta karakteri görünür tutar)
+        UpdateCharacterLight();
+
+        // Fenerin açık/kapalı durumunu kontrol et
+        UpdateFlashlightState();
 
         // Yürüme animasyonu
         if (animator != null)
@@ -206,22 +243,20 @@ public class PlayerMovement : MonoBehaviour
         {
             bool facingLeft = spriteRenderer != null && spriteRenderer.flipX;
 
-            // Yumuşak el pozisyonu geçişi (sağ/sol el)
+            // Inspector'dan yapılandırılabilen flashlightOffset (X yönü karakter yönüne göre döner)
             Vector3 targetLocalPos = new Vector3(facingLeft ? -flashlightOffset.x : flashlightOffset.x, flashlightOffset.y, 0f);
             flashlightLight.localPosition = Vector3.Lerp(flashlightLight.localPosition, targetLocalPos, Time.deltaTime * smoothFollowSpeed);
 
-            // Çapraz hareket eğimi (yukarı/aşağı bakma)
             float tilt = 0f;
             if (movement.y > 0.1f)
             {
-                tilt = facingLeft ? -22f : 22f;
+                tilt = facingLeft ? -20f : 20f;
             }
             else if (movement.y < -0.1f)
             {
-                tilt = facingLeft ? 22f : -22f;
+                tilt = facingLeft ? 20f : -20f;
             }
 
-            // Yürüme esnasında fenerin doğal sallanması
             float sway = 0f;
             if (movement.sqrMagnitude > 0.01f)
             {
@@ -233,28 +268,50 @@ public class PlayerMovement : MonoBehaviour
         }
     }
 
-    private void UpdateCharacterVisibility()
+    private void UpdateCharacterLight()
     {
         if (characterLight == null) return;
 
-        if (cachedGlobalLight == null)
+        characterLight.transform.localPosition = new Vector3(characterLightOffset.x, characterLightOffset.y, 0f);
+
+        if (!characterLight.enabled)
         {
-            GameObject globalLightObj = GameObject.Find("Global Light 2D");
-            if (globalLightObj != null)
-            {
-                cachedGlobalLight = globalLightObj.GetComponent<Light2D>();
-            }
+            characterLight.enabled = true;
+        }
+    }
+
+    private void UpdateFlashlightState()
+    {
+        if (flashlightBeam == null && flashlightLight == null) return;
+
+        bool hasFlashlight = InventoryManager.HasItem("Flashlight");
+        if (!hasFlashlight && GameTimelineManager.Instance != null)
+        {
+            hasFlashlight = GameTimelineManager.Instance.HasFlashlight;
         }
 
-        bool isStage3 = GameTimelineManager.Instance != null &&
-                        GameTimelineManager.Instance.CurrentStage == GameStage.Stage3_Utilities;
+        // Fener Stage 3 başladığında otomatik olarak açılır (Stage 4'te de açık kalır)
+        bool isStage3OrLater = GameTimelineManager.Instance != null &&
+            (GameTimelineManager.Instance.CurrentStage == GameStage.Stage3_Utilities ||
+             GameTimelineManager.Instance.CurrentStage == GameStage.Stage4_Stairwell);
 
-        // Sahne karanlık mı? (Deprem sonrası elektrik kesintisi veya global ışığın sönmesi)
-        bool isDark = isStage3 || (cachedGlobalLight != null && cachedGlobalLight.intensity < 0.6f);
+        // Stage 1, Stage 2, Victory ve Rewind/Reset aşamalarında kapalı kalır
+        bool shouldFlashlightBeOn = hasFlashlight && isStage3OrLater;
 
-        // Kullanıcı isteği: Karakter karanlıkta yarım görünür olmalı (half visible ~0.45)
-        float targetIntensity = isDark ? characterHalfIntensity : 0.05f;
-        characterLight.intensity = Mathf.MoveTowards(characterLight.intensity, targetIntensity, Time.deltaTime * 3f);
-        characterLight.enabled = characterLight.intensity > 0.01f;
+        // Timeline olmayan sahnede test ediliyorsa fener varsa açık tut
+        if (GameTimelineManager.Instance == null)
+        {
+            shouldFlashlightBeOn = hasFlashlight;
+        }
+
+        if (flashlightBeam != null && flashlightBeam.enabled != shouldFlashlightBeOn)
+        {
+            flashlightBeam.enabled = shouldFlashlightBeOn;
+        }
+
+        if (flashlightLight != null && flashlightLight.gameObject.activeSelf != shouldFlashlightBeOn)
+        {
+            flashlightLight.gameObject.SetActive(shouldFlashlightBeOn);
+        }
     }
 }

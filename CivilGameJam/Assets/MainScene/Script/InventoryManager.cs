@@ -13,12 +13,14 @@ public static class InventoryManager
     private static void OnSubsystemRegistration()
     {
         items.Clear();
+        InventorySelection.ResetSelection();
     }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     public static void ResetInventory()
     {
         items.Clear();
+        InventorySelection.ResetSelection();
     }
 
     public static void AddItem(string itemName)

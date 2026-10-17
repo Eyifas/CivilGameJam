@@ -52,13 +52,21 @@ public class InventorySlotDrag : MonoBehaviour, IBeginDragHandler, IDragHandler,
 
     public void OnPointerUp(PointerEventData eventData)
     {
-        isPointerDown = false;
         if (isDragging)
         {
             isDragging = false;
+            isPointerDown = false;
             if (inventoryUI != null)
             {
                 inventoryUI.OnSlotEndDrag(slotIndex, eventData.position);
+            }
+        }
+        else if (isPointerDown)
+        {
+            isPointerDown = false;
+            if (Vector2.Distance(eventData.position, pointerDownPos) < 12f)
+            {
+                InventorySelection.SelectSlot(slotIndex);
             }
         }
     }
@@ -68,12 +76,16 @@ public class InventorySlotDrag : MonoBehaviour, IBeginDragHandler, IDragHandler,
         Vector2 currentMousePos = GetCurrentMousePosition();
         bool isMouseHeld = IsMouseButtonHeld();
 
-        // 1. Trigger drag if pointer is held and moved past threshold
+        // 1. Trigger drag if pointer is held and moved past threshold, or handle click if released
         if (isPointerDown && !isDragging)
         {
             if (!isMouseHeld)
             {
                 isPointerDown = false;
+                if (Vector2.Distance(currentMousePos, pointerDownPos) < 12f)
+                {
+                    InventorySelection.SelectSlot(slotIndex);
+                }
             }
             else if (Vector2.Distance(currentMousePos, pointerDownPos) > 6f)
             {

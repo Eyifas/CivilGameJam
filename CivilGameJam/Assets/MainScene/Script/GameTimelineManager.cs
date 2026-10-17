@@ -453,6 +453,8 @@ public class GameTimelineManager : MonoBehaviour
             Debug.Log("<color=green>[VICTORY] Checked official e-Devlet alert and led neighbors on foot to the Toplanma Alanı!</color>");
             currentStage = GameStage.Victory;
             SetObjectiveText("VICTORY! Safely reached the Official Disaster Assembly Area!");
+            InventorySelection.ResetSelection();
+            if (playerMovement != null) playerMovement.ResetFlashlight();
             OnStageChanged?.Invoke(currentStage);
         }
     }
@@ -470,7 +472,12 @@ public class GameTimelineManager : MonoBehaviour
 
         Debug.Log($"<color=red>[TIME LOOP REWIND] {educationalReason}</color>");
 
-        if (playerMovement != null) playerMovement.enabled = false;
+        if (playerMovement != null)
+        {
+            playerMovement.ResetFlashlight();
+            playerMovement.enabled = false;
+        }
+        InventorySelection.ResetSelection();
         if (QTEManager.Instance != null) QTEManager.Instance.CancelAll();
 
         StartCoroutine(RewindRoutine(educationalReason));
@@ -516,8 +523,13 @@ public class GameTimelineManager : MonoBehaviour
         isGasShutOff = false;
         isBreakerShutOff = false;
 
-        // Reset Inventory
+        // Reset Inventory & selection
+        InventorySelection.ResetSelection();
         InventoryManager.ResetInventory();
+        if (playerMovement != null)
+        {
+            playerMovement.ResetFlashlight();
+        }
 
         // Reset any physical room items (Flashlight, Medkit, Painting)
         var items = FindObjectsByType<RoomItemInteractable>(FindObjectsSortMode.None);

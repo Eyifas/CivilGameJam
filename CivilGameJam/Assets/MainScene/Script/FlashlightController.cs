@@ -20,18 +20,19 @@ public class FlashlightController : MonoBehaviour
             return;
         }
 
-        bool hasFlashlight = InventoryManager.HasItem("Flashlight");
+        bool hasFlashlight = InventoryManager.HasItem("Flashlight") ||
+            (GameTimelineManager.Instance != null && GameTimelineManager.Instance.HasFlashlight);
 
-        bool isDark =
-            GameTimelineManager.Instance != null &&
-            GameTimelineManager.Instance.CurrentStage == GameStage.Stage3_Utilities;
+        bool isStage3 = GameTimelineManager.Instance != null &&
+            (GameTimelineManager.Instance.CurrentStage == GameStage.Stage3_Utilities ||
+             GameTimelineManager.Instance.CurrentStage == GameStage.Stage4_Stairwell);
 
-        bool flashlightSelected =
-            InventorySelection.SelectedItem == "Flashlight";
+        bool isGameActive = GameTimelineManager.Instance == null ||
+            (GameTimelineManager.Instance.CurrentStage != GameStage.Victory &&
+             GameTimelineManager.Instance.CurrentStage != GameStage.Rewinding &&
+             GameTimelineManager.Instance.CurrentStage != GameStage.Stage1_Preparation &&
+             GameTimelineManager.Instance.CurrentStage != GameStage.Stage2_Tremor);
 
-        flashlightLight.enabled =
-            hasFlashlight &&
-            isDark &&
-            flashlightSelected;
+        flashlightLight.enabled = hasFlashlight && isStage3 && isGameActive;
     }
 }
