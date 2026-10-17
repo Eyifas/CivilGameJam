@@ -67,9 +67,14 @@ public class DrawerController : MonoBehaviour
         }
     }
 
-    private void UpdateItems()
+    private void Start()
     {
-        // Çekiç
+        UpdateItems();
+    }
+
+    public void UpdateItems()
+    {
+        // Hammer
         if (hammerObject != null)
         {
             if (InventoryManager.HasItem("Hammer"))
@@ -82,10 +87,10 @@ public class DrawerController : MonoBehaviour
             }
         }
 
-        // Vida
+        // Vida / Nails
         if (vidaObject != null)
         {
-            if (InventoryManager.HasItem("Screw"))
+            if (InventoryManager.HasItem("Vida") || InventoryManager.HasItem("Screw") || InventoryManager.HasItem("Nail") || InventoryManager.HasItem("Nails"))
             {
                 vidaObject.SetActive(false);
             }

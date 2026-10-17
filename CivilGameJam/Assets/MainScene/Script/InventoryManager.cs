@@ -41,7 +41,27 @@ public static class InventoryManager
 
     public static bool HasItem(string itemName)
     {
-        return items.Contains(itemName);
+        if (items.Contains(itemName)) return true;
+
+        // Check aliases for nails / screw / vida
+        if (IsNailsOrScrew(itemName))
+        {
+            foreach (var it in items)
+            {
+                if (IsNailsOrScrew(it)) return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsNailsOrScrew(string name)
+    {
+        if (string.IsNullOrEmpty(name)) return false;
+        return name.Equals("Vida", System.StringComparison.OrdinalIgnoreCase) ||
+               name.Equals("Screw", System.StringComparison.OrdinalIgnoreCase) ||
+               name.Equals("Nail", System.StringComparison.OrdinalIgnoreCase) ||
+               name.Equals("Nails", System.StringComparison.OrdinalIgnoreCase);
     }
 
     public static List<string> GetItems()

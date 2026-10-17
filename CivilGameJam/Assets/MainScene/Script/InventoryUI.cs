@@ -56,6 +56,9 @@ public class InventoryUI : MonoBehaviour
         switch (itemName)
         {
             case "Vida":
+            case "Screw":
+            case "Nail":
+            case "Nails":
                  return vidaSprite;
 
             case "Hammer":

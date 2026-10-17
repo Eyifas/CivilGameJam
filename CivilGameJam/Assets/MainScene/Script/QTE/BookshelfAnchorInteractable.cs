@@ -15,7 +15,8 @@ public class BookshelfAnchorInteractable : MonoBehaviour
     [SerializeField] private float timePerTarget = 2.0f;
 
     [Header("Requirements (Optional)")]
-    [SerializeField] private bool requireHammer = false;
+    [SerializeField] private bool requireHammer = true;
+    [SerializeField] private bool requireNails = true;
 
     [Header("UI & Visuals")]
     [SerializeField] private GameObject interactionPrompt;
@@ -114,9 +115,12 @@ public class BookshelfAnchorInteractable : MonoBehaviour
     {
         if (!isInteractable || isAnchored || isQTEActive || !playerInRange) return;
 
-        if (requireHammer && !InventoryManager.HasItem("Hammer"))
+        bool hasHammer = !requireHammer || InventoryManager.HasItem("Hammer");
+        bool hasNails = !requireNails || InventoryManager.HasItem("Vida") || InventoryManager.HasItem("Screw") || InventoryManager.HasItem("Nail") || InventoryManager.HasItem("Nails");
+
+        if (!hasHammer || !hasNails)
         {
-            Debug.Log("[Bookshelf] You need tools (Hammer) from the drawer to anchor this!");
+            Debug.Log("[Bookshelf] You need tools (Hammer and Nails) from the drawer to anchor this!");
             return;
         }
 

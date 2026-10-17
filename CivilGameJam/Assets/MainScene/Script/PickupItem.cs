@@ -35,6 +35,12 @@ public class PickupItem : MonoBehaviour
                 // Eşyayı sahneden kaldır
                 gameObject.SetActive(false);
 
+                var drawer = FindFirstObjectByType<DrawerController>();
+                if (drawer != null)
+                {
+                    drawer.UpdateItems();
+                }
+
                 Debug.Log(itemName + " envantere eklendi!");
             }
         }

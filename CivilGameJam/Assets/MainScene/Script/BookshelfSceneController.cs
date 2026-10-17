@@ -19,7 +19,8 @@ public class BookshelfSceneController : MonoBehaviour
     [Header("QTE / Click Settings")]
     [SerializeField] private int requiredHits = 3;
     [SerializeField] private float timePerHit = 2.0f;
-    [SerializeField] private bool requireHammer = false;
+    [SerializeField] private bool requireHammer = true;
+    [SerializeField] private bool requireNails = true;
 
     private bool isAnchored = false;
     private bool isQTERunning = false;
@@ -86,10 +87,24 @@ public class BookshelfSceneController : MonoBehaviour
     {
         if (isAnchored || isQTERunning) return;
 
-        if (requireHammer && !InventoryManager.HasItem("Hammer"))
+        bool hasHammer = !requireHammer || InventoryManager.HasItem("Hammer");
+        bool hasNails = !requireNails || InventoryManager.HasItem("Vida") || InventoryManager.HasItem("Screw") || InventoryManager.HasItem("Nail") || InventoryManager.HasItem("Nails");
+
+        if (!hasHammer || !hasNails)
         {
-            UpdateInstruction("<color=red>You need tools (Hammer) from the drawer to anchor this! Press [E] to return.</color>");
-            Debug.LogWarning("[BookshelfSceneController] Hammer is required to anchor the bookshelf! Pick it up in DrawerScene first.");
+            if (!hasHammer && !hasNails)
+            {
+                UpdateInstruction("<color=red>You need a Hammer and Nails from the drawer to anchor this! Press [E] to return.</color>");
+            }
+            else if (!hasHammer)
+            {
+                UpdateInstruction("<color=red>You need a Hammer from the drawer to anchor this! Press [E] to return.</color>");
+            }
+            else
+            {
+                UpdateInstruction("<color=red>You need Nails from the drawer to anchor this! Press [E] to return.</color>");
+            }
+            Debug.LogWarning("[BookshelfSceneController] Hammer and Nails are required to anchor the bookshelf! Pick them up in DrawerScene first.");
             return;
         }
 

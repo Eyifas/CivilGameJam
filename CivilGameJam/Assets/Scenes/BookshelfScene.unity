@@ -622,6 +622,7 @@ MonoBehaviour:
   requiredHits: 4
   timePerHit: 2
   requireHammer: 1
+  requireNails: 1
   returnSceneName: MainScene
   autoReturnDelay: 1
 --- !u!1660057539 &9223372036854775807
