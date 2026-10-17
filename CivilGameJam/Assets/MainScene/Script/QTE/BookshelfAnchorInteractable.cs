@@ -1,8 +1,9 @@
 using UnityEngine;
+using UnityEngine.UI;
 
 /// <summary>
 /// Attach this component to an interactive object (like the Wall 1 Bookshelf)
-/// to trigger the Target Click QTE when the player presses interaction key in range.
+/// to trigger the Target Click QTE when the player presses interaction key or clicks in range.
 /// Successfully completing the QTE anchors the bookshelf and informs GameTimelineManager.
 /// </summary>
 [RequireComponent(typeof(Collider2D))]
@@ -23,16 +24,55 @@ public class BookshelfAnchorInteractable : MonoBehaviour
     private bool playerInRange = false;
     private bool isAnchored = false;
     private bool isQTEActive = false;
+    private bool isInteractable = true;
 
-    private void Start()
+    private void Awake()
     {
-        if (interactionPrompt != null) interactionPrompt.SetActive(false);
+        FindPrompt();
+
+        if (interactionPrompt != null)
+        {
+            if (interactionPrompt.TryGetComponent<Button>(out var btn))
+            {
+                btn.onClick.RemoveListener(TriggerAnchorQTE);
+                btn.onClick.AddListener(TriggerAnchorQTE);
+            }
+            interactionPrompt.SetActive(false);
+        }
+
         if (visualSecuredIndicator != null) visualSecuredIndicator.SetActive(false);
+    }
+
+    private void FindPrompt()
+    {
+        if (interactionPrompt != null) return;
+
+        var child = transform.Find("InteractionPrompt");
+        if (child == null) child = transform.Find("E Button");
+        if (child != null)
+        {
+            interactionPrompt = child.gameObject;
+            return;
+        }
+
+        if (transform.parent != null)
+        {
+            var sibling = transform.parent.Find("InteractionPrompt");
+            if (sibling == null) sibling = transform.parent.Find("E Button");
+            if (sibling != null)
+            {
+                interactionPrompt = sibling.gameObject;
+                return;
+            }
+        }
     }
 
     private void OnTriggerEnter2D(Collider2D other)
     {
-        if (isAnchored) return;
+        if (isAnchored || !isInteractable) return;
+
+        if (GameTimelineManager.Instance != null && GameTimelineManager.Instance.CurrentStage != GameStage.Stage1_Preparation)
+            return;
 
         if (other.CompareTag("Player"))
         {
@@ -52,7 +92,16 @@ public class BookshelfAnchorInteractable : MonoBehaviour
 
     private void Update()
     {
-        if (playerInRange && !isAnchored && !isQTEActive)
+        if (!isInteractable || isAnchored || isQTEActive) return;
+
+        // Stage guard: Only active during Stage 1
+        if (GameTimelineManager.Instance != null && GameTimelineManager.Instance.CurrentStage != GameStage.Stage1_Preparation)
+        {
+            SetInteractable(false);
+            return;
+        }
+
+        if (playerInRange)
         {
             if (UnityEngine.InputSystem.Keyboard.current != null && UnityEngine.InputSystem.Keyboard.current.eKey.wasPressedThisFrame)
             {
@@ -61,8 +110,10 @@ public class BookshelfAnchorInteractable : MonoBehaviour
         }
     }
 
-    private void TriggerAnchorQTE()
+    public void TriggerAnchorQTE()
     {
+        if (!isInteractable || isAnchored || isQTEActive || !playerInRange) return;
+
         if (requireHammer && !InventoryManager.HasItem("Hammer"))
         {
             Debug.Log("[Bookshelf] You need tools (Hammer) from the drawer to anchor this!");
@@ -106,13 +157,26 @@ public class BookshelfAnchorInteractable : MonoBehaviour
     {
         isQTEActive = false;
         Debug.Log("<color=red>[Bookshelf] Failed to anchor the bookshelf in time!</color>");
-        if (playerInRange && interactionPrompt != null) interactionPrompt.SetActive(true);
+        if (playerInRange && isInteractable && interactionPrompt != null) interactionPrompt.SetActive(true);
+    }
+
+    public void SetInteractable(bool active)
+    {
+        isInteractable = active;
+        if (!active)
+        {
+            playerInRange = false;
+            isQTEActive = false;
+            if (interactionPrompt != null) interactionPrompt.SetActive(false);
+        }
     }
 
     public void ResetState()
     {
         isAnchored = false;
         isQTEActive = false;
+        isInteractable = true;
+        playerInRange = false;
         if (visualSecuredIndicator != null) visualSecuredIndicator.SetActive(false);
         if (interactionPrompt != null) interactionPrompt.SetActive(false);
     }

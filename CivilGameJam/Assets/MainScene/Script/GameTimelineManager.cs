@@ -216,6 +216,27 @@ public class GameTimelineManager : MonoBehaviour
             playerMovement.enabled = false;
         }
 
+        // Cancel any active QTE (e.g. if player was anchoring bookshelf when earthquake struck)
+        if (QTEManager.Instance != null)
+        {
+            QTEManager.Instance.CancelAll();
+        }
+
+        // Disable all Stage 1 interaction zones, prompts, and room items
+        if (InteractionManager.Instance != null)
+        {
+            InteractionManager.Instance.DisableAllPrompts();
+        }
+
+        var zones = FindObjectsByType<InteractionZone>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        foreach (var z in zones) z.SetInteractable(false);
+
+        var roomItems = FindObjectsByType<RoomItemInteractable>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        foreach (var r in roomItems) r.SetInteractable(false);
+
+        var bookshelves = FindObjectsByType<BookshelfAnchorInteractable>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        foreach (var b in bookshelves) b.SetInteractable(false);
+
         // Present world-space choices: [S] Desk vs [E] Door
         if (stage2ChoiceGroup != null)
         {
@@ -489,10 +510,22 @@ public class GameTimelineManager : MonoBehaviour
         }
 
         // Reset Bookshelf state
-        var bookshelf = FindFirstObjectByType<BookshelfAnchorInteractable>();
+        var bookshelf = FindFirstObjectByType<BookshelfAnchorInteractable>(FindObjectsInactive.Include);
         if (bookshelf != null)
         {
             bookshelf.ResetState();
+        }
+
+        // Re-enable all interaction zones
+        var zones = FindObjectsByType<InteractionZone>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        foreach (var z in zones)
+        {
+            z.SetInteractable(true);
+        }
+
+        if (InteractionManager.Instance != null)
+        {
+            InteractionManager.Instance.ResetPromptsSystem();
         }
 
         // Restart Stage 1

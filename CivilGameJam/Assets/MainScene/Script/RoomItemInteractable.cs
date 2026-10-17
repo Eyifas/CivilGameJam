@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.UI;
 
 public enum ItemPickupType
 {
@@ -23,16 +24,37 @@ public class RoomItemInteractable : MonoBehaviour
 
     private bool playerInRange = false;
     private bool isCollectedOrRemoved = false;
+    private bool isInteractable = true;
 
-    private void Start()
+    private void Awake()
     {
-        if (interactionPrompt != null) interactionPrompt.SetActive(false);
+        // Auto-find child prompt if not explicitly assigned
+        if (interactionPrompt == null)
+        {
+            var child = transform.Find("InteractionPrompt");
+            if (child == null) child = transform.Find("E Button");
+            if (child != null) interactionPrompt = child.gameObject;
+        }
+
+        if (interactionPrompt != null)
+        {
+            if (interactionPrompt.TryGetComponent<Button>(out var btn))
+            {
+                btn.onClick.RemoveListener(PerformInteraction);
+                btn.onClick.AddListener(PerformInteraction);
+            }
+            interactionPrompt.SetActive(false);
+        }
+
         if (itemVisualOnFloor != null) itemVisualOnFloor.SetActive(false);
     }
 
     private void OnTriggerEnter2D(Collider2D other)
     {
-        if (isCollectedOrRemoved) return;
+        if (isCollectedOrRemoved || !isInteractable) return;
+
+        if (GameTimelineManager.Instance != null && GameTimelineManager.Instance.CurrentStage != GameStage.Stage1_Preparation)
+            return;
 
         if (other.CompareTag("Player"))
         {
@@ -52,7 +74,16 @@ public class RoomItemInteractable : MonoBehaviour
 
     private void Update()
     {
-        if (playerInRange && !isCollectedOrRemoved)
+        if (!isInteractable || isCollectedOrRemoved) return;
+
+        // Stage guard: Only active during Stage 1
+        if (GameTimelineManager.Instance != null && GameTimelineManager.Instance.CurrentStage != GameStage.Stage1_Preparation)
+        {
+            SetInteractable(false);
+            return;
+        }
+
+        if (playerInRange)
         {
             if (Keyboard.current != null && Keyboard.current.eKey.wasPressedThisFrame)
             {
@@ -61,8 +92,10 @@ public class RoomItemInteractable : MonoBehaviour
         }
     }
 
-    private void PerformInteraction()
+    public void PerformInteraction()
     {
+        if (!isInteractable || isCollectedOrRemoved || !playerInRange) return;
+
         isCollectedOrRemoved = true;
         if (interactionPrompt != null) interactionPrompt.SetActive(false);
 
@@ -90,10 +123,22 @@ public class RoomItemInteractable : MonoBehaviour
         }
     }
 
+    public void SetInteractable(bool active)
+    {
+        isInteractable = active;
+        if (!active)
+        {
+            playerInRange = false;
+            if (interactionPrompt != null) interactionPrompt.SetActive(false);
+        }
+    }
+
     // Called on timeline rewind to restore items to initial state
     public void ResetItem()
     {
         isCollectedOrRemoved = false;
+        isInteractable = true;
+        playerInRange = false;
         gameObject.SetActive(true);
         if (TryGetComponent<SpriteRenderer>(out var sr)) sr.enabled = true;
         if (itemVisualOnFloor != null) itemVisualOnFloor.SetActive(false);
