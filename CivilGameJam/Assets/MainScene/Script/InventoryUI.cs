@@ -8,7 +8,7 @@ public class InventoryUI : MonoBehaviour
 
     [Header("Item Sprites")]
     [SerializeField] private Sprite hammerSprite;
-    [SerializeField] private Sprite nailSprite;
+    [SerializeField] private Sprite vidaSprite;
     [SerializeField] private Sprite flashlightSprite;
     [SerializeField] private Sprite firstAidKitSprite;
 
@@ -55,11 +55,11 @@ public class InventoryUI : MonoBehaviour
     {
         switch (itemName)
         {
+            case "Vida":
+                 return vidaSprite;
+
             case "Hammer":
                 return hammerSprite;
-
-            case "Nail":
-                return nailSprite;
 
             case "Flashlight":
                 return flashlightSprite;
