@@ -3,13 +3,19 @@ using UnityEngine.InputSystem;
 
 public class PlayerMovement : MonoBehaviour
 {
-    // Remembers the player's exact room coordinates when transitioning to/from scenes like DrawerScene
+    // Sahne değişimlerinde oyuncunun bulunduğu konumu hatırlar
     public static Vector3? LastSavedPosition = null;
 
     [Header("Spawn Settings")]
     [SerializeField] private Vector3 defaultSpawnPosition = new Vector3(-9.6f, -2.2f, 0f);
 
-    public float speed = 8f;
+    [Header("Movement")]
+    [SerializeField] private float speed = 8f;
+
+    [Header("Visual")]
+    [SerializeField] private SpriteRenderer spriteRenderer;
+    [SerializeField] private Animator animator;
+
     private Vector2 movement;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -20,7 +26,6 @@ public class PlayerMovement : MonoBehaviour
 
     private void OnValidate()
     {
-        // Auto-fix if Unity Inspector previously serialized Y as 0
         if (Mathf.Approximately(defaultSpawnPosition.y, 0f))
         {
             defaultSpawnPosition.y = -2.2f;
@@ -29,18 +34,30 @@ public class PlayerMovement : MonoBehaviour
 
     private void Awake()
     {
+        // Inspector'dan bağlamadıysan otomatik bulmaya çalış
+        if (spriteRenderer == null)
+        {
+            spriteRenderer = GetComponentInChildren<SpriteRenderer>();
+        }
+
+        if (animator == null)
+        {
+            animator = GetComponentInChildren<Animator>();
+        }
+
+        // Önceden kaydedilmiş konum varsa oradan başla
         if (LastSavedPosition.HasValue)
         {
             transform.position = LastSavedPosition.Value;
-            LastSavedPosition = null; // One-time consumption: clear it so future resets spawn at default!
+            LastSavedPosition = null;
         }
         else
         {
-            // Safety guard: Ensure Y is -2.2f if Inspector held the old 0f value
             if (Mathf.Approximately(defaultSpawnPosition.y, 0f))
             {
                 defaultSpawnPosition.y = -2.2f;
             }
+
             transform.position = defaultSpawnPosition;
         }
     }
@@ -62,7 +79,27 @@ public class PlayerMovement : MonoBehaviour
 
     private void Update()
     {
+        // Hareket
         Vector3 direction = new Vector3(movement.x, movement.y, 0f);
         transform.position += direction * speed * Time.deltaTime;
+
+        // Sağa / sola dönme
+        if (spriteRenderer != null)
+        {
+            if (movement.x > 0.01f)
+            {
+                spriteRenderer.flipX = false;
+            }
+            else if (movement.x < -0.01f)
+            {
+                spriteRenderer.flipX = true;
+            }
+        }
+
+        // Yürüme animasyonu
+        if (animator != null)
+        {
+            animator.SetBool("isWalking", movement.sqrMagnitude > 0.01f);
+        }
     }
 }

@@ -8,6 +8,7 @@ public class DrawerController : MonoBehaviour
     [SerializeField] private Sprite bothOpenSprite;
 
     [SerializeField] private GameObject hammerObject;
+    [SerializeField] private GameObject vidaObject;
 
     private SpriteRenderer spriteRenderer;
 
@@ -18,10 +19,15 @@ public class DrawerController : MonoBehaviour
     {
         spriteRenderer = GetComponent<SpriteRenderer>();
 
-        // Oyun başladığında çekici gizle
+        // Başlangıçta ikisi de görünmesin
         if (hammerObject != null)
         {
             hammerObject.SetActive(false);
+        }
+
+        if (vidaObject != null)
+        {
+            vidaObject.SetActive(false);
         }
 
         UpdateDrawerVisual();
@@ -38,7 +44,7 @@ public class DrawerController : MonoBehaviour
         rightOpen = !rightOpen;
 
         UpdateDrawerVisual();
-        UpdateHammer();
+        UpdateItems();
     }
 
     private void UpdateDrawerVisual()
@@ -61,21 +67,32 @@ public class DrawerController : MonoBehaviour
         }
     }
 
-    private void UpdateHammer()
+    private void UpdateItems()
     {
-        if (hammerObject == null)
+        // Çekiç
+        if (hammerObject != null)
         {
-            return;
+            if (InventoryManager.HasItem("Hammer"))
+            {
+                hammerObject.SetActive(false);
+            }
+            else
+            {
+                hammerObject.SetActive(rightOpen);
+            }
         }
 
-        // Çekiç daha önce alınmışsa bir daha gösterme
-        if (InventoryManager.HasItem("Hammer"))
+        // Vida
+        if (vidaObject != null)
         {
-            hammerObject.SetActive(false);
-            return;
+            if (InventoryManager.HasItem("Screw"))
+            {
+                vidaObject.SetActive(false);
+            }
+            else
+            {
+                vidaObject.SetActive(rightOpen);
+            }
         }
-
-        // Sağ çekmece açıksa göster, kapalıysa gizle
-        hammerObject.SetActive(rightOpen);
     }
 }
