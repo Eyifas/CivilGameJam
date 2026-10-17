@@ -1,0 +1,32 @@
+using UnityEngine;
+using UnityEngine.InputSystem;
+
+public class PickupItem : MonoBehaviour
+{
+    [SerializeField] private string itemName;
+
+    private Collider2D itemCollider;
+
+    private void Awake()
+    {
+        itemCollider = GetComponent<Collider2D>();
+    }
+
+    private void Update()
+    {
+        if (Mouse.current.leftButton.wasPressedThisFrame)
+        {
+            Vector2 mousePosition =
+                Camera.main.ScreenToWorldPoint(Mouse.current.position.ReadValue());
+
+            if (itemCollider.OverlapPoint(mousePosition))
+            {
+                InventoryManager.AddItem(itemName);
+
+                gameObject.SetActive(false);
+
+                Debug.Log(itemName + " envantere eklendi!");
+            }
+        }
+    }
+}
