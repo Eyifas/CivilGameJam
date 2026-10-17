@@ -5,6 +5,7 @@ using UnityEngine.InputSystem;
 public class InteractionZone : MonoBehaviour
 {
     [SerializeField] private GameObject interactionPrompt;
+    [SerializeField] private string sceneName;
 
     private bool playerInside = false;
 
@@ -20,7 +21,7 @@ public class InteractionZone : MonoBehaviour
     {
         if (playerInside && Keyboard.current.eKey.wasPressedThisFrame)
         {
-            SceneManager.LoadScene("DrawerScene");
+            SceneManager.LoadScene(sceneName);
         }
     }
 
