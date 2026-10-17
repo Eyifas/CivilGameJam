@@ -121,6 +121,8 @@ public class ReturnToRoom : MonoBehaviour
     private void Update()
     {
         if (isReturning) return;
+        if (CupboardSceneController.Instance != null && CupboardSceneController.Instance.IsBusy) return;
+        if (TableSceneController.Instance != null && TableSceneController.Instance.IsBusy) return;
 
         // Prevent immediate exit if player was holding [E] upon entering the scene
         if (!canExit)
@@ -165,6 +167,8 @@ public class ReturnToRoom : MonoBehaviour
     private void OnGUI()
     {
         if (!showOnScreenButton || customCanvasButton != null) return;
+        if (CupboardSceneController.Instance != null && CupboardSceneController.Instance.IsBusy) return;
+        if (TableSceneController.Instance != null && TableSceneController.Instance.IsBusy) return;
 
         EnsureStyles();
 

@@ -41,6 +41,8 @@ public class TableSceneController : MonoBehaviour
     [SerializeField] private float autoReturnDelay = 1.2f;
     [SerializeField] private TMP_Text instructionText;
 
+    public static TableSceneController Instance { get; private set; }
+
     // Public state for external queries (e.g. ReturnToRoom)
     public bool IsBusy => isHolding || loweringCoroutine != null || isTransitioningBack;
 
@@ -54,6 +56,8 @@ public class TableSceneController : MonoBehaviour
 
     private void Awake()
     {
+        Instance = this;
+
         if (instructionText == null)
         {
             instructionText = FindFirstObjectByType<TMP_Text>();
@@ -496,4 +500,13 @@ public class TableSceneController : MonoBehaviour
 
         GUI.color = Color.white;
     }
+
+    private void OnDestroy()
+    {
+        if (Instance == this)
+        {
+            Instance = null;
+        }
+    }
 }
+

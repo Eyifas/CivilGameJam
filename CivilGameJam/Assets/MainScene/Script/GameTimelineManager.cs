@@ -144,6 +144,24 @@ public class GameTimelineManager : MonoBehaviour
         if (roomCamera == null) roomCamera = FindFirstObjectByType<RoomCamera>();
         if (playerMovement == null) playerMovement = FindFirstObjectByType<PlayerMovement>();
         if (stage2ChoiceGroup == null) stage2ChoiceGroup = FindFirstObjectByType<WorldChoiceGroup>(FindObjectsInactive.Include);
+        EnsureCupboardTriggerZone();
+    }
+
+    private void EnsureCupboardTriggerZone()
+    {
+        var dolap = GameObject.Find("dolap mutfak1");
+        if (dolap != null)
+        {
+            var zone = dolap.transform.Find("InteractionZone");
+            if (zone != null)
+            {
+                if (!zone.TryGetComponent<CupboardTriggerZone>(out var ctz))
+                {
+                    ctz = zone.gameObject.AddComponent<CupboardTriggerZone>();
+                }
+                ctz.CheckStatus();
+            }
+        }
     }
 
     private void Start()
@@ -716,6 +734,13 @@ public class GameTimelineManager : MonoBehaviour
 
     private void UndoLastFatalActionAndRestore(GameStage failedStage, string educationalReason, float addedDuration)
     {
+        // If the player failed while inside a sub-scene (like CupboardScene), load MainScene behind closed eyes
+        if (SceneManager.GetActiveScene().name != "MainScene")
+        {
+            SceneManager.LoadScene("MainScene");
+            RebindSceneReferences();
+        }
+
         // 1. Retrieve the snapshot before the last fatal action was performed
         TimelineSnapshot snapshot;
         if (actionHistory.Count > 1)
@@ -790,6 +815,13 @@ public class GameTimelineManager : MonoBehaviour
         foreach (var z in zones)
         {
             z.CheckCompletionStatus();
+        }
+
+        // (d) Sync Cupboard trigger zone in MainScene
+        var cupboardTriggers = FindObjectsByType<CupboardTriggerZone>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        foreach (var ctz in cupboardTriggers)
+        {
+            ctz.CheckStatus();
         }
 
         // 5. Restore Stage & Timer with dynamic added time
@@ -910,6 +942,9 @@ public class GameTimelineManager : MonoBehaviour
         var bookshelves = FindObjectsByType<BookshelfAnchorInteractable>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         foreach (var b in bookshelves) b.SetInteractable(true);
 
+        var cupboardTriggers = FindObjectsByType<CupboardTriggerZone>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        foreach (var ctz in cupboardTriggers) ctz.CheckStatus();
+
         if (InteractionManager.Instance != null)
         {
             InteractionManager.Instance.ResetPromptsSystem();
@@ -931,6 +966,9 @@ public class GameTimelineManager : MonoBehaviour
         isCabinetSecured = false;
         isGasShutOff = false;
         isBreakerShutOff = false;
+
+        var cupboardTriggers = FindObjectsByType<CupboardTriggerZone>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        foreach (var ctz in cupboardTriggers) ctz.CheckStatus();
 
         // Reset Inventory & selection
         InventorySelection.ResetSelection();
@@ -1049,6 +1087,7 @@ public class GameTimelineManager : MonoBehaviour
     public bool IsBookshelfAnchored => isBookshelfAnchored;
     public bool IsPaintingRemoved => isPaintingRemoved;
     public bool IsCandleExtinguished => isCandleExtinguished;
+    public bool IsCabinetSecured => isCabinetSecured;
 
     #endregion
 }
