@@ -4,18 +4,9 @@ using UnityEngine.InputSystem;
 
 public class InteractionZone : MonoBehaviour
 {
-    [SerializeField] private GameObject interactionPrompt;
     [SerializeField] private string sceneName;
 
     private bool playerInside = false;
-
-    private void Start()
-    {
-        if (interactionPrompt != null)
-        {
-            interactionPrompt.SetActive(false);
-        }
-    }
 
     private void Update()
     {
@@ -31,9 +22,9 @@ public class InteractionZone : MonoBehaviour
         {
             playerInside = true;
 
-            if (interactionPrompt != null)
+            if (InteractionManager.Instance != null)
             {
-                interactionPrompt.SetActive(true);
+                InteractionManager.Instance.EnterZone();
             }
         }
     }
@@ -44,9 +35,9 @@ public class InteractionZone : MonoBehaviour
         {
             playerInside = false;
 
-            if (interactionPrompt != null)
+            if (InteractionManager.Instance != null)
             {
-                interactionPrompt.SetActive(false);
+                InteractionManager.Instance.ExitZone();
             }
         }
     }
