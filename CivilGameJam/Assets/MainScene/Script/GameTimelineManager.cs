@@ -100,6 +100,12 @@ public class GameTimelineManager : MonoBehaviour
     [SerializeField] private TMP_Text rewindCountdownText;
     [SerializeField] private float rewindDelay = 3.5f;
 
+    [Header("Intro Rewind Settings")]
+    [Tooltip("If true, plays the time rewind clock animation when entering the game before Stage 1 starts")]
+    [SerializeField] private bool playIntroRewind = true;
+    [TextArea(2, 4)]
+    [SerializeField] private string introRewindMessage = "A second chance... You have 60 seconds before the earthquake strikes! Secure loose hazards and pack emergency supplies!";
+
     [Header("System References")]
     [SerializeField] private RoomCamera roomCamera;
     [SerializeField] private WorldChoiceGroup stage2ChoiceGroup;
@@ -197,9 +203,38 @@ public class GameTimelineManager : MonoBehaviour
         {
             hasStarted = true;
             EnsureTimeRewindController();
+            EnsureHazardVisualManager();
             if (rewindPanel != null) rewindPanel.SetActive(false);
-            StartStage1();
+
+            if (playIntroRewind)
+            {
+                StartCoroutine(PlayIntroAndStartGame());
+            }
+            else
+            {
+                StartStage1();
+            }
         }
+    }
+
+    private IEnumerator PlayIntroAndStartGame()
+    {
+        if (playerMovement != null) playerMovement.enabled = false;
+        SetHUDVisibility(false);
+
+        // Wait a frame for scene and system initialization
+        yield return null;
+
+        EnsureTimeRewindController();
+
+        TimeRewindController.Instance.PlayIntroRewind(
+            introMessage: introRewindMessage,
+            onComplete: () =>
+            {
+                SetHUDVisibility(true);
+                StartStage1();
+            }
+        );
     }
 
     private void Update()
@@ -258,6 +293,18 @@ public class GameTimelineManager : MonoBehaviour
 
     public float CalculateRewindDuration(GameStage failedStage, string educationalReason)
     {
+        return CalculateRewindDuration(failedStage, educationalReason, currentStageTimer);
+    }
+
+    public float CalculateRewindDuration(GameStage failedStage, string educationalReason, float timeLeft)
+    {
+        // If the user fails while the time left is less than 10 seconds, give 15 seconds
+        // because 5 seconds would be too short since the countdown starts at 5 seconds.
+        if (timeLeft < 10f)
+        {
+            return 15f;
+        }
+
         // Major preparation mistakes (unaddressed painting / candle) or stage timeouts get 15s.
         // Quick reaction mistakes (switch spark, door rush, cabinet QTE) get 5s.
         bool isMajorPrepOrTimeout =
@@ -477,6 +524,10 @@ public class GameTimelineManager : MonoBehaviour
 
     private void HandleStage2Timeout()
     {
+        if (currentStage != GameStage.Rewinding)
+        {
+            RecordActionSnapshot("Tremor Decision Timed Out");
+        }
         TriggerRewind("TIME RAN OUT: Frozen in panic! In an earthquake, drop under sturdy furniture within seconds before violent shaking knocks you down!");
     }
 
@@ -499,13 +550,15 @@ public class GameTimelineManager : MonoBehaviour
         }
 
         currentStage = GameStage.Stage3_Utilities;
-        currentStageTimer = stage3Duration;
+        float carriedOverBonus = Mathf.Max(0f, currentStageTimer);
+        currentStageTimer = stage3Duration + carriedOverBonus;
         isTimerRunning = true;
 
         if (playerMovement != null) playerMovement.enabled = true;
 
         SetObjectiveText("STAGE 3: Gas leak detected! Secure cabinet & shut off utilities safely.");
-        Debug.Log("[Timeline] Stage 3 Started: Post-Shaking Utilities & Hazards.");
+        Debug.Log($"[Timeline] Stage 3 Started: Post-Shaking Utilities & Hazards. Timer: {currentStageTimer:F1}s (including +{carriedOverBonus:F1}s bonus).");
+        UpdateTimerHUD();
         OnStageChanged?.Invoke(currentStage);
     }
 
@@ -877,66 +930,42 @@ public class GameTimelineManager : MonoBehaviour
         }
 
         // 5. Restore Stage & Timer with dynamic added time
-        bool wasCandleOrPaintingTremorFail = failedStage == GameStage.Stage2_Tremor &&
-            (educationalReason.IndexOf("candle", StringComparison.OrdinalIgnoreCase) >= 0 ||
-             educationalReason.IndexOf("painting", StringComparison.OrdinalIgnoreCase) >= 0);
-
-        if (wasCandleOrPaintingTremorFail)
+        if (failedStage == GameStage.Stage2_Tremor || failedStage == GameStage.Stage1_Preparation)
         {
-            // Hazard was left unaddressed in Stage 1 -> Rewind to Stage 1 Preparation with variable bonus (e.g. +15s)
+            // Hazard left unaddressed, door rush, or panic freeze -> Rewind to Stage 1 Preparation
+            // The Stage 2 earthquake choice will only trigger based on the game timer expiring
             currentStage = GameStage.Stage1_Preparation;
             currentStageTimer = Mathf.Max(snapshot.stageTimer + addedDuration, addedDuration);
             isTimerRunning = true;
-            SetObjectiveText($"TIME REWOUND (+{addedDuration:0}s)! Fix room hazards before the earthquake strikes!");
-            ReEnableStage1Interactions();
-            if (playerMovement != null)
-            {
-                playerMovement.enabled = true;
-                playerMovement.transform.position = new Vector3(-9.6f, -2.2f, 0f);
-            }
-        }
-        else if (failedStage == GameStage.Stage1_Preparation)
-        {
-            currentStage = GameStage.Stage1_Preparation;
-            currentStageTimer = Mathf.Max(snapshot.stageTimer + addedDuration, addedDuration);
-            isTimerRunning = true;
-            SetObjectiveText($"STAGE 1 (+{addedDuration:0}s): Fix room hazards & pack flashlight + first-aid kit!");
-            ReEnableStage1Interactions();
-            if (playerMovement != null)
-            {
-                playerMovement.enabled = true;
-                playerMovement.transform.position = snapshot.playerPosition;
-            }
-        }
-        else if (failedStage == GameStage.Stage2_Tremor)
-        {
-            // Player ran for the door or froze: That fatal action never happened!
-            // Re-present choice with added decision time
-            currentStage = GameStage.Stage2_Tremor;
-            isTimerRunning = false;
-            stage2TremorDuration += addedDuration;
-            SetObjectiveText("EARTHQUAKE STRIKES! MAKE YOUR DECISION!");
+            stage2TremorDuration = 5f;
 
             if (roomCamera != null)
             {
-                roomCamera.StartEarthquake();
-            }
-
-            if (playerMovement != null)
-            {
-                playerMovement.enabled = false;
-                playerMovement.transform.position = snapshot.playerPosition;
+                roomCamera.StopEarthquake();
             }
 
             if (stage2ChoiceGroup != null)
             {
-                stage2ChoiceGroup.gameObject.SetActive(true);
-                stage2ChoiceGroup.PresentChoices(
-                    headerTitle: "EARTHQUAKE HITS! CHOOSE FAST!",
-                    duration: stage2TremorDuration,
-                    onChoice: HandleStage2Choice,
-                    onTimeout: HandleStage2Timeout
-                );
+                stage2ChoiceGroup.gameObject.SetActive(false);
+            }
+
+            if (failedStage == GameStage.Stage2_Tremor)
+            {
+                SetObjectiveText($"TIME REWOUND (+{addedDuration:0}s)! Fix room hazards & take cover before earthquake strikes!");
+            }
+            else
+            {
+                SetObjectiveText($"STAGE 1 (+{addedDuration:0}s): Fix room hazards & pack flashlight + first-aid kit!");
+            }
+
+            ReEnableStage1Interactions();
+
+            if (playerMovement != null)
+            {
+                playerMovement.enabled = true;
+                playerMovement.transform.position = snapshot.playerPosition != Vector3.zero
+                    ? snapshot.playerPosition
+                    : new Vector3(-9.6f, -2.2f, 0f);
             }
         }
         else if (failedStage == GameStage.Stage3_Utilities)
@@ -1008,6 +1037,7 @@ public class GameTimelineManager : MonoBehaviour
         // Reset time loop counters & history
         rewindsUsed = 0;
         actionHistory.Clear();
+        stage2TremorDuration = 5f;
 
         // Reset flags
         isBookshelfAnchored = false;

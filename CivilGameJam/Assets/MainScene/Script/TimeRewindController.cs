@@ -914,6 +914,197 @@ public class TimeRewindController : MonoBehaviour
     }
 
     /// <summary>
+    /// Plays the intro rewind animation when starting from the start screen before Stage 1 begins:
+    /// Starts with eyes closed in darkness, opens onto the clock spinning backward in time,
+    /// displays the mission objective, closes eyes, and opens onto the live room.
+    /// </summary>
+    public void PlayIntroRewind(string introMessage, Action onComplete)
+    {
+        if (isRewinding) return;
+        StartCoroutine(IntroRewindRoutine(introMessage, onComplete));
+    }
+
+    private IEnumerator IntroRewindRoutine(string message, Action onComplete)
+    {
+        isRewinding = true;
+
+        // Ensure UI is initialized and screen starts pitch black behind closed eyelids
+        if (eyelidsRoot != null) eyelidsRoot.SetActive(true);
+        if (clockRoot != null) clockRoot.SetActive(false);
+        SetEyeOpenImmediate(0f); // Screen is pitch black
+
+        yield return new WaitForSecondsRealtime(0.2f);
+
+        // -------------------------------------------------------------
+        // PHASE 1: Setup Clock Behind Closed Eyes
+        // -------------------------------------------------------------
+        if (clockRoot != null)
+        {
+            clockRoot.SetActive(true);
+            if (headerText != null) headerText.text = "REWINDING TIME";
+            if (remainingLoopsText != null) remainingLoopsText.text = "<color=#5CE1E6>TIME LOOPS REMAINING: 3 / 3</color>";
+            if (reasonText != null) reasonText.text = message;
+            if (bonusBadgeText != null) bonusBadgeText.gameObject.SetActive(false);
+            if (digitalClockText != null) digitalClockText.text = "00:00";
+            if (hourHand != null) hourHand.localEulerAngles = new Vector3(0, 0, -30f);
+            if (minuteHand != null) minuteHand.localEulerAngles = new Vector3(0, 0, 0f);
+            if (secondHand != null) secondHand.localEulerAngles = new Vector3(0, 0, 0f);
+        }
+
+        // Open eyelids to reveal clock
+        float elapsed = 0f;
+        while (elapsed < eyeOpenDuration)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            float t = Mathf.Clamp01(elapsed / eyeOpenDuration);
+            float openAmount = Mathf.SmoothStep(0f, 1f, t);
+            SetEyeOpenAmount(openAmount);
+            yield return null;
+        }
+        SetEyeOpenAmount(1f); // Fully revealed
+
+        // -------------------------------------------------------------
+        // PHASE 2: Clock Spinning Backwards with Audio (2.4s)
+        // -------------------------------------------------------------
+        PlaySound(customRewindWhoosh, synthRewindWhoosh, 0.75f);
+
+        float spinElapsed = 0f;
+        float tickTimer = 0f;
+        float currentDisplaySeconds = 0f;
+
+        while (spinElapsed < rewindSpinDuration)
+        {
+            float dt = Time.unscaledDeltaTime;
+            spinElapsed += dt;
+            tickTimer += dt;
+
+            float progress = spinElapsed / rewindSpinDuration;
+            float speedMult = progress > 0.75f ? Mathf.Lerp(1f, 0.05f, (progress - 0.75f) / 0.25f) : 1f;
+
+            float secSpin = 720f * speedMult * dt;
+            float minSpin = 360f * speedMult * dt;
+            float hourSpin = 60f * speedMult * dt;
+
+            if (secondHand != null) secondHand.Rotate(0f, 0f, secSpin);
+            if (minuteHand != null) minuteHand.Rotate(0f, 0f, minSpin);
+            if (hourHand != null) hourHand.Rotate(0f, 0f, hourSpin);
+
+            if (clockPanel != null)
+            {
+                float pulse = 1f + Mathf.Sin(spinElapsed * 14f) * 0.035f;
+                clockPanel.localScale = new Vector3(pulse, pulse, 1f);
+            }
+
+            if (clockAura != null)
+            {
+                float auraAlpha = 0.25f + Mathf.Sin(spinElapsed * 10f) * 0.15f;
+                clockAura.color = new Color(0.2f, 0.75f, 1f, auraAlpha);
+            }
+
+            float tickInterval = Mathf.Lerp(0.09f, 0.22f, progress > 0.75f ? (progress - 0.75f) / 0.25f : 0f);
+            if (tickTimer >= tickInterval)
+            {
+                tickTimer = 0f;
+                PlaySound(customReverseTick, synthReverseTick, 0.5f);
+            }
+
+            currentDisplaySeconds += dt * 15f;
+            int totalSec = Mathf.FloorToInt(currentDisplaySeconds);
+            if (digitalClockText != null)
+            {
+                digitalClockText.text = $"-{totalSec / 60:00}:{totalSec % 60:00}";
+            }
+
+            yield return null;
+        }
+
+        // Time lock chime & Target Time badge
+        PlaySound(customTimeLockChime, synthTimeLockChime, 0.9f);
+
+        if (bonusBadgeText != null)
+        {
+            bonusBadgeText.gameObject.SetActive(true);
+            bonusBadgeText.text = "<color=#FFD700>60 SECONDS UNTIL THE EARTHQUAKE</color>\n<size=55%><color=#D0D0D0>[Space / Click to Start]</color></size>";
+            bonusBadgeText.transform.localScale = Vector3.one * 1.35f;
+        }
+
+        // Hold clock for comfortable reading
+        float holdTimer = 0f;
+        while (holdTimer < educationalReasonHoldDuration)
+        {
+            holdTimer += Time.unscaledDeltaTime;
+            if (bonusBadgeText != null)
+            {
+                bonusBadgeText.transform.localScale = Vector3.Lerp(bonusBadgeText.transform.localScale, Vector3.one, Time.unscaledDeltaTime * 6f);
+            }
+
+            if (holdTimer > 0.75f)
+            {
+                if (Keyboard.current != null && (Keyboard.current.spaceKey.wasPressedThisFrame || Keyboard.current.eKey.wasPressedThisFrame))
+                {
+                    break;
+                }
+                if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame)
+                {
+                    break;
+                }
+            }
+
+            yield return null;
+        }
+
+        // -------------------------------------------------------------
+        // PHASE 3: Eye Closes over the Clock (0.55s)
+        // -------------------------------------------------------------
+        PlaySound(customEyelidThump, synthEyelidThump, 0.8f);
+        elapsed = 0f;
+        while (elapsed < eyeCloseDuration * 0.85f)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            float t = Mathf.Clamp01(elapsed / (eyeCloseDuration * 0.85f));
+            float openAmount = 1f - Mathf.SmoothStep(0f, 1f, t);
+            SetEyeOpenAmount(openAmount);
+            yield return null;
+        }
+        SetEyeOpenAmount(0f); // Screen is black
+
+        yield return new WaitForSecondsRealtime(0.25f);
+
+        if (clockRoot != null)
+        {
+            clockRoot.SetActive(false);
+        }
+
+        yield return null;
+
+        // -------------------------------------------------------------
+        // PHASE 4: Eye Opens Back to the Live Game (0.7s)
+        // -------------------------------------------------------------
+        elapsed = 0f;
+        while (elapsed < eyeOpenDuration * 1.3f)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            float t = Mathf.Clamp01(elapsed / (eyeOpenDuration * 1.3f));
+            float openAmount = Mathf.SmoothStep(0f, 1f, t);
+            SetEyeOpenAmount(openAmount);
+            yield return null;
+        }
+        SetEyeOpenAmount(1f); // Fully open
+
+        if (eyelidsRoot != null)
+        {
+            eyelidsRoot.SetActive(false);
+        }
+
+        isRewinding = false;
+
+        // -------------------------------------------------------------
+        // PHASE 5: Start Game!
+        // -------------------------------------------------------------
+        onComplete?.Invoke();
+    }
+
+    /// <summary>
     /// Executes the Game Over sequence when all 3 time loop rewinds have been exhausted.
     /// Displays timeline collapsed with cracked/frozen clock, educational reason,
     /// and waits for player to restart run.
