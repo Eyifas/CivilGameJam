@@ -532,6 +532,7 @@ public class GameTimelineManager : MonoBehaviour
         {
             bookshelf.ResetState();
         }
+        BookshelfSceneController.ResetToolState();
 
         // Re-enable all interaction zones
         var zones = FindObjectsByType<InteractionZone>(FindObjectsInactive.Include, FindObjectsSortMode.None);

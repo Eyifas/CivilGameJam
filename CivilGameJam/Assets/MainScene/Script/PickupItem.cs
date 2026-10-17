@@ -14,6 +14,13 @@ public class PickupItem : MonoBehaviour
 
     private void Start()
     {
+        bool bookshelfAnchored = GameTimelineManager.Instance != null && GameTimelineManager.Instance.IsBookshelfAnchored;
+        if (bookshelfAnchored && (itemName == "Hammer" || itemName == "Vida" || itemName == "Nails"))
+        {
+            gameObject.SetActive(false);
+            return;
+        }
+
         // Bu eşya daha önce alındıysa tekrar görünmesin
         if (InventoryManager.HasItem(itemName))
         {

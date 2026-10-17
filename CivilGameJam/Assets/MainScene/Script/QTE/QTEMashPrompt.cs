@@ -95,7 +95,7 @@ public class QTEMashPrompt : MonoBehaviour
         currentProgress = Mathf.Clamp01(currentProgress);
 
         // Check for click/mash input
-        bool inputTriggered = (Keyboard.current != null && (Keyboard.current.spaceKey.wasPressedThisFrame || Keyboard.current.eKey.wasPressedThisFrame))
+        bool inputTriggered = (Keyboard.current != null && (Keyboard.current.spaceKey.wasPressedThisFrame || Keyboard.current.wKey.wasPressedThisFrame))
                            || (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame);
 
         if (inputTriggered)

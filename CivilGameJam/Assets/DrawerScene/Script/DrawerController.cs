@@ -74,10 +74,12 @@ public class DrawerController : MonoBehaviour
 
     public void UpdateItems()
     {
+        bool bookshelfAnchored = GameTimelineManager.Instance != null && GameTimelineManager.Instance.IsBookshelfAnchored;
+
         // Hammer
         if (hammerObject != null)
         {
-            if (InventoryManager.HasItem("Hammer"))
+            if (bookshelfAnchored || InventoryManager.HasItem("Hammer"))
             {
                 hammerObject.SetActive(false);
             }
@@ -90,7 +92,7 @@ public class DrawerController : MonoBehaviour
         // Vida / Nails
         if (vidaObject != null)
         {
-            if (InventoryManager.HasItem("Vida") || InventoryManager.HasItem("Screw") || InventoryManager.HasItem("Nail") || InventoryManager.HasItem("Nails"))
+            if (bookshelfAnchored || InventoryManager.HasItem("Vida") || InventoryManager.HasItem("Screw") || InventoryManager.HasItem("Nail") || InventoryManager.HasItem("Nails"))
             {
                 vidaObject.SetActive(false);
             }

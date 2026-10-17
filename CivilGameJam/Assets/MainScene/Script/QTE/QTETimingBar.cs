@@ -105,8 +105,8 @@ public class QTETimingBar : MonoBehaviour
 
         UpdatePointerVisual();
 
-        // Check Input: Space bar, E key, or Left Mouse Click
-        bool inputTriggered = (Keyboard.current != null && (Keyboard.current.spaceKey.wasPressedThisFrame || Keyboard.current.eKey.wasPressedThisFrame))
+        // Check Input: Space bar, W key, or Left Mouse Click
+        bool inputTriggered = (Keyboard.current != null && (Keyboard.current.spaceKey.wasPressedThisFrame || Keyboard.current.wKey.wasPressedThisFrame))
                            || (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame);
 
         if (inputTriggered)

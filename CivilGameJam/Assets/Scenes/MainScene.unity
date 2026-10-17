@@ -414,7 +414,7 @@ MonoBehaviour:
   requiredHits: 3
   failOnMiss: 0
   maxMisses: 2
-  allowedKeys: 13000000140000001f0000002000000001000000i
+  allowedKeys: 25000000140000001f0000002000000001000000i
 --- !u!1 &224317707
 GameObject:
   m_ObjectHideFlags: 0

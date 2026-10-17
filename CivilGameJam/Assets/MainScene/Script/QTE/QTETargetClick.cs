@@ -33,10 +33,11 @@ public class QTETargetClick : MonoBehaviour
     [SerializeField] private int maxMisses = 2;
 
     [Header("Key Pool Configuration")]
+    [Tooltip("Keys that can be randomly chosen as targets. Key.E and Key.Escape are automatically excluded to prevent conflict with scene exit.")]
     [SerializeField] private Key[] allowedKeys = new Key[]
     {
         Key.Space,
-        Key.F,
+        Key.W,
         Key.Q,
         Key.R,
         Key.C
@@ -56,6 +57,8 @@ public class QTETargetClick : MonoBehaviour
 
     private void Awake()
     {
+        SanitizeAllowedKeys();
+
         if (rootPanel == null)
         {
             rootPanel = gameObject;
@@ -102,6 +105,8 @@ public class QTETargetClick : MonoBehaviour
     /// </summary>
     public void StartQTE(int targetCount = 3, float timeLimitPerTarget = 1.8f, Action onComplete = null, Action onFail = null)
     {
+        SanitizeAllowedKeys();
+
         requiredHits = targetCount;
         timePerTarget = timeLimitPerTarget;
         currentHits = 0;
@@ -116,6 +121,34 @@ public class QTETargetClick : MonoBehaviour
         SpawnNextTarget();
     }
 
+    private void SanitizeAllowedKeys()
+    {
+        var cleanKeys = new System.Collections.Generic.List<Key>();
+        if (allowedKeys != null)
+        {
+            foreach (var k in allowedKeys)
+            {
+                // Key.E is the Go Back / Return key in mini-scenes; Key.Escape is global cancel.
+                // Never allow them as QTE prompts to avoid input conflicts.
+                if (k != Key.E && k != Key.Escape && k != Key.None)
+                {
+                    cleanKeys.Add(k);
+                }
+            }
+        }
+
+        if (cleanKeys.Count == 0)
+        {
+            cleanKeys.Add(Key.Space);
+            cleanKeys.Add(Key.W);
+            cleanKeys.Add(Key.Q);
+            cleanKeys.Add(Key.R);
+            cleanKeys.Add(Key.F);
+        }
+
+        allowedKeys = cleanKeys.ToArray();
+    }
+
     private void SpawnNextTarget()
     {
         targetTimer = timePerTarget;
@@ -127,6 +160,8 @@ public class QTETargetClick : MonoBehaviour
 
     private void PickRandomKey()
     {
+        SanitizeAllowedKeys();
+
         if (allowedKeys == null || allowedKeys.Length == 0)
         {
             currentPromptKey = Key.Space;

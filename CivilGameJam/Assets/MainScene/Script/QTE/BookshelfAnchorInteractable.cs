@@ -148,6 +148,18 @@ public class BookshelfAnchorInteractable : MonoBehaviour
         isAnchored = true;
         Debug.Log("<color=green>[Bookshelf] Bookshelf securely anchored to the wall!</color>");
 
+        InventoryManager.RemoveItem("Hammer");
+        InventoryManager.RemoveItem("Vida");
+        InventoryManager.RemoveItem("Nails");
+        InventoryManager.RemoveItem("Nail");
+        InventoryManager.RemoveItem("Screw");
+
+        var ui = FindAnyObjectByType<InventoryUI>();
+        if (ui != null)
+        {
+            ui.UpdateInventoryUI();
+        }
+
         if (GameTimelineManager.Instance != null)
         {
             GameTimelineManager.Instance.SetBookshelfAnchored(true);

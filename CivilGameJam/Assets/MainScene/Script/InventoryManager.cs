@@ -9,6 +9,12 @@ public static class InventoryManager
 {
     private static List<string> items = new List<string>();
 
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void OnSubsystemRegistration()
+    {
+        items.Clear();
+    }
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     public static void ResetInventory()
     {
@@ -53,6 +59,41 @@ public static class InventoryManager
         }
 
         return false;
+    }
+
+    public static bool RemoveItem(string itemName)
+    {
+        if (string.IsNullOrEmpty(itemName)) return false;
+
+        bool removedAny = false;
+
+        for (int i = items.Count - 1; i >= 0; i--)
+        {
+            if (string.Equals(items[i].Trim(), itemName.Trim(), System.StringComparison.OrdinalIgnoreCase))
+            {
+                string removed = items[i];
+                items.RemoveAt(i);
+                Debug.Log($"[InventoryManager] Item removed: {removed}");
+                removedAny = true;
+            }
+        }
+
+        // Check aliases for nails / screw / vida
+        if (IsNailsOrScrew(itemName))
+        {
+            for (int i = items.Count - 1; i >= 0; i--)
+            {
+                if (IsNailsOrScrew(items[i]))
+                {
+                    string removed = items[i];
+                    items.RemoveAt(i);
+                    Debug.Log($"[InventoryManager] Item removed: {removed} (matched alias {itemName})");
+                    removedAny = true;
+                }
+            }
+        }
+
+        return removedAny;
     }
 
     private static bool IsNailsOrScrew(string name)
