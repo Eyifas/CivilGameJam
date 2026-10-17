@@ -16,6 +16,9 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] private SpriteRenderer spriteRenderer;
     [SerializeField] private Animator animator;
 
+    [Header("Flashlight")]
+    [SerializeField] private Transform flashlightLight;
+
     private Vector2 movement;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -89,17 +92,34 @@ public class PlayerMovement : MonoBehaviour
             if (movement.x > 0.01f)
             {
                 spriteRenderer.flipX = false;
+
+                // Feneri sağa çevir
+                if (flashlightLight != null)
+                {
+                    flashlightLight.localRotation =
+                        Quaternion.Euler(0f, 0f, -90f);
+                }
             }
             else if (movement.x < -0.01f)
             {
                 spriteRenderer.flipX = true;
+
+                // Feneri sola çevir
+                if (flashlightLight != null)
+                {
+                    flashlightLight.localRotation =
+                        Quaternion.Euler(0f, 0f, 90f);
+                }
             }
         }
 
         // Yürüme animasyonu
         if (animator != null)
         {
-            animator.SetBool("isWalking", movement.sqrMagnitude > 0.01f);
+            animator.SetBool(
+                "isWalking",
+                movement.sqrMagnitude > 0.01f
+            );
         }
     }
 }

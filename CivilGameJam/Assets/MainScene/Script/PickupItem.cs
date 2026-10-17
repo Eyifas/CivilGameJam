@@ -14,7 +14,7 @@ public class PickupItem : MonoBehaviour
 
     private void Start()
     {
-        // Bu eşya daha önce alındıysa tekrar görünmesin
+        // Eşya daha önce alındıysa tekrar görünmesin
         if (InventoryManager.HasItem(itemName))
         {
             gameObject.SetActive(false);
@@ -28,21 +28,29 @@ public class PickupItem : MonoBehaviour
             Vector2 mousePosition =
                 Camera.main.ScreenToWorldPoint(Mouse.current.position.ReadValue());
 
-            if (itemCollider.OverlapPoint(mousePosition))
+            if (itemCollider != null && itemCollider.OverlapPoint(mousePosition))
             {
-                InventoryManager.AddItem(itemName);
-
-                // Eşyayı sahneden kaldır
-                gameObject.SetActive(false);
-
-                var drawer = FindFirstObjectByType<DrawerController>();
-                if (drawer != null)
-                {
-                    drawer.UpdateItems();
-                }
-
-                Debug.Log(itemName + " envantere eklendi!");
+                TakeItem();
             }
+        }
+    }
+
+    private void TakeItem()
+    {
+        // Envantere ekle
+        InventoryManager.AddItem(itemName);
+
+        Debug.Log(itemName + " envantere eklendi!");
+
+        // Eşyayı sahneden kaldır
+        gameObject.SetActive(false);
+
+        // Çekmece içindeki eşya durumlarını güncelle
+        DrawerController drawer = FindFirstObjectByType<DrawerController>();
+
+        if (drawer != null)
+        {
+            drawer.UpdateItems();
         }
     }
 }
