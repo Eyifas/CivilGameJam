@@ -9,6 +9,7 @@ public class DrawerController : MonoBehaviour
 
     [SerializeField] private GameObject hammerObject;
     [SerializeField] private GameObject vidaObject;
+    [SerializeField] private GameObject flashlightObject;
 
     private SpriteRenderer spriteRenderer;
 
@@ -19,7 +20,6 @@ public class DrawerController : MonoBehaviour
     {
         spriteRenderer = GetComponent<SpriteRenderer>();
 
-        // Başlangıçta ikisi de görünmesin
         if (hammerObject != null)
         {
             hammerObject.SetActive(false);
@@ -30,13 +30,25 @@ public class DrawerController : MonoBehaviour
             vidaObject.SetActive(false);
         }
 
+        if (flashlightObject != null)
+        {
+            flashlightObject.SetActive(false);
+        }
+
         UpdateDrawerVisual();
+    }
+
+    private void Start()
+    {
+        UpdateItems();
     }
 
     public void ToggleLeftDrawer()
     {
         leftOpen = !leftOpen;
+
         UpdateDrawerVisual();
+        UpdateItems();
     }
 
     public void ToggleRightDrawer()
@@ -67,16 +79,11 @@ public class DrawerController : MonoBehaviour
         }
     }
 
-    private void Start()
-    {
-        UpdateItems();
-    }
-
     public void UpdateItems()
     {
         bool bookshelfAnchored = GameTimelineManager.Instance != null && GameTimelineManager.Instance.IsBookshelfAnchored;
 
-        // Hammer
+        // Çekiç - sağ çekmece
         if (hammerObject != null)
         {
             if (bookshelfAnchored || InventoryManager.HasItem("Hammer"))
@@ -89,16 +96,33 @@ public class DrawerController : MonoBehaviour
             }
         }
 
-        // Vida / Nails
+        // Vida - sağ çekmece
         if (vidaObject != null)
         {
-            if (bookshelfAnchored || InventoryManager.HasItem("Vida") || InventoryManager.HasItem("Screw") || InventoryManager.HasItem("Nail") || InventoryManager.HasItem("Nails"))
+            if (bookshelfAnchored ||
+                InventoryManager.HasItem("Vida") ||
+                InventoryManager.HasItem("Screw") ||
+                InventoryManager.HasItem("Nail") ||
+                InventoryManager.HasItem("Nails"))
             {
                 vidaObject.SetActive(false);
             }
             else
             {
                 vidaObject.SetActive(rightOpen);
+            }
+        }
+
+        // Fener - sol çekmece
+        if (flashlightObject != null)
+        {
+            if (InventoryManager.HasItem("Flashlight"))
+            {
+                flashlightObject.SetActive(false);
+            }
+            else
+            {
+                flashlightObject.SetActive(leftOpen);
             }
         }
     }
