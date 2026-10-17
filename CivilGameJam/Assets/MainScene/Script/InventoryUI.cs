@@ -9,31 +9,40 @@ public class InventoryUI : MonoBehaviour
     [Header("Item Sprites")]
     [SerializeField] private Sprite hammerSprite;
     [SerializeField] private Sprite nailSprite;
+    [SerializeField] private Sprite flashlightSprite;
+    [SerializeField] private Sprite firstAidKitSprite;
 
     private void Start()
     {
         UpdateInventoryUI();
     }
+
     private void Update()
     {
-       UpdateInventoryUI();
+        UpdateInventoryUI();
     }
 
     private void UpdateInventoryUI()
     {
         List<string> items = InventoryManager.GetItems();
 
-        // Önce bütün slotları gizle
-        foreach (Image icon in itemIcons)
+        if (itemIcons == null) return;
+
+        // Hide all slots first
+        for (int i = 0; i < itemIcons.Length; i++)
         {
-            icon.gameObject.SetActive(false);
+            if (itemIcons[i] != null)
+            {
+                itemIcons[i].gameObject.SetActive(false);
+            }
         }
 
-        // Eşyaları alındıkları sıraya göre yerleştir
+        // Display collected items in order
         for (int i = 0; i < items.Count && i < itemIcons.Length; i++)
         {
-            Sprite itemSprite = GetItemSprite(items[i]);
+            if (itemIcons[i] == null) continue;
 
+            Sprite itemSprite = GetItemSprite(items[i]);
             if (itemSprite != null)
             {
                 itemIcons[i].sprite = itemSprite;
@@ -51,6 +60,14 @@ public class InventoryUI : MonoBehaviour
 
             case "Nail":
                 return nailSprite;
+
+            case "Flashlight":
+                return flashlightSprite;
+
+            case "FirstAidKit":
+            case "First-Aid Kit":
+            case "First Aid Kit":
+                return firstAidKitSprite;
 
             default:
                 return null;

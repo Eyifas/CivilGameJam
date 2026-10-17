@@ -38,8 +38,15 @@ public class WorldChoiceGroup : MonoBehaviour
 
     private void Awake()
     {
-        if (timerDisplayRoot != null) timerDisplayRoot.SetActive(false);
-        HideAllPrompts();
+        HideTimerAndPrompts();
+    }
+
+    private void Start()
+    {
+        if (!isActive)
+        {
+            HideTimerAndPrompts();
+        }
     }
 
     /// <summary>
@@ -47,8 +54,28 @@ public class WorldChoiceGroup : MonoBehaviour
     /// </summary>
     public void PresentChoices(string headerTitle, float duration, Action<string> onChoice, Action onTimeout = null)
     {
+        // Make sure this choice group GameObject is active and on top of canvas
+        gameObject.SetActive(true);
+        transform.SetAsLastSibling();
+
+        if (timerDisplayRoot != null && timerDisplayRoot != gameObject)
+        {
+            timerDisplayRoot.SetActive(true);
+        }
+
+        if (timerBar != null)
+        {
+            timerBar.gameObject.SetActive(true);
+        }
+
+        if (timerText != null)
+        {
+            timerText.gameObject.SetActive(true);
+        }
+
         if (headerTitleText != null)
         {
+            headerTitleText.gameObject.SetActive(true);
             headerTitleText.text = headerTitle;
         }
         totalDuration = duration;
@@ -127,7 +154,31 @@ public class WorldChoiceGroup : MonoBehaviour
     private void EndChoiceInteraction()
     {
         isActive = false;
-        if (timerDisplayRoot != null) timerDisplayRoot.SetActive(false);
+        HideTimerAndPrompts();
+    }
+
+    public void HideTimerAndPrompts()
+    {
+        if (timerDisplayRoot != null && timerDisplayRoot != gameObject)
+        {
+            timerDisplayRoot.SetActive(false);
+        }
+
+        if (timerBar != null)
+        {
+            timerBar.gameObject.SetActive(false);
+        }
+
+        if (timerText != null)
+        {
+            timerText.gameObject.SetActive(false);
+        }
+
+        if (headerTitleText != null)
+        {
+            headerTitleText.gameObject.SetActive(false);
+        }
+
         HideAllPrompts();
     }
 

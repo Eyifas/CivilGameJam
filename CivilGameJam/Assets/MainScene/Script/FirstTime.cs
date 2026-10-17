@@ -1,6 +1,10 @@
 using UnityEngine;
 using TMPro;
 
+/// <summary>
+/// Legacy prototype timer. If GameTimelineManager is present, this script disables itself
+/// to avoid conflicting with the timeline manager's 60-second stage timer.
+/// </summary>
 public class FirstTime : MonoBehaviour
 {
     [SerializeField] private float firstTime = 90f;
@@ -8,6 +12,16 @@ public class FirstTime : MonoBehaviour
     [SerializeField] private RoomCamera roomCamera;
 
     private bool timeEnded = false;
+
+    private void Awake()
+    {
+        // If the new unified GameTimelineManager exists, let it take full control
+        if (FindFirstObjectByType<GameTimelineManager>() != null)
+        {
+            Debug.Log("[FirstTime] GameTimelineManager detected in scene. Disabling legacy FirstTime script.");
+            enabled = false;
+        }
+    }
 
     private void Update()
     {

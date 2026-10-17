@@ -85,6 +85,7 @@ public class WorldChoicePrompt : MonoBehaviour
 
         isPromptActive = true;
         gameObject.SetActive(true);
+        transform.SetAsLastSibling();
 
         if (canvasGroup != null)
         {
