@@ -80,10 +80,24 @@ public class InteractionZone : MonoBehaviour
             SyncTableVisuals();
         }
 
-        // 2. Disable zone if completed
+        // 2. Disable zone if completed, or re-enable if undone
         if (IsZoneCompleted())
         {
             DisableZonePermanently();
+        }
+        else
+        {
+            EnableZone();
+        }
+    }
+
+    public void EnableZone()
+    {
+        isInteractable = true;
+        var col = GetComponent<Collider2D>();
+        if (col != null)
+        {
+            col.enabled = true;
         }
     }
 

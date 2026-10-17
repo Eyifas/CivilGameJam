@@ -23,6 +23,8 @@ public class RoomItemInteractable : MonoBehaviour
     [SerializeField] private string promptLabel = "";
     [SerializeField] private GameObject itemVisualOnFloor;  // For painting: show it sitting safely on the floor
 
+    public ItemPickupType ItemType => itemType;
+
     private bool playerInRange = false;
     private bool isCollectedOrRemoved = false;
     private bool isInteractable = true;
@@ -158,5 +160,32 @@ public class RoomItemInteractable : MonoBehaviour
         if (TryGetComponent<SpriteRenderer>(out var sr)) sr.enabled = true;
         if (itemVisualOnFloor != null) itemVisualOnFloor.SetActive(false);
         if (interactionPrompt != null) interactionPrompt.SetActive(false);
+    }
+
+    public void RestoreState(bool collectedOrRemoved)
+    {
+        isCollectedOrRemoved = collectedOrRemoved;
+        if (collectedOrRemoved)
+        {
+            if (itemType == ItemPickupType.RemovePainting)
+            {
+                if (TryGetComponent<SpriteRenderer>(out var sr)) sr.enabled = false;
+                if (itemVisualOnFloor != null) itemVisualOnFloor.SetActive(true);
+            }
+            else
+            {
+                gameObject.SetActive(false);
+            }
+            if (interactionPrompt != null) interactionPrompt.SetActive(false);
+        }
+        else
+        {
+            gameObject.SetActive(true);
+            isInteractable = true;
+            playerInRange = false;
+            if (TryGetComponent<SpriteRenderer>(out var sr)) sr.enabled = true;
+            if (itemVisualOnFloor != null) itemVisualOnFloor.SetActive(false);
+            if (interactionPrompt != null) interactionPrompt.SetActive(false);
+        }
     }
 }

@@ -5,6 +5,7 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using TMPro;
 using UnityEngine.UI;
+using UnityEngine.InputSystem;
 
 public enum GameStage
 {
@@ -15,6 +16,33 @@ public enum GameStage
     Stage5_StreetFinale,   // Street aftershock, sign QTE, rumor choice, assembly area
     Rewinding,             // Time loop rewind transition
     Victory                // Safe ending at assembly area
+}
+
+[System.Serializable]
+public struct TimelineSnapshot
+{
+    public string actionDescription;
+    public GameStage stage;
+    public float stageTimer;
+    public Vector3 playerPosition;
+
+    // Stage 1
+    public bool isBookshelfAnchored;
+    public bool isPaintingRemoved;
+    public bool isCandleExtinguished;
+    public bool hasFlashlight;
+    public bool hasFirstAidKit;
+    public List<string> inventoryItems;
+
+    // Stage 3
+    public bool isCabinetSecured;
+    public bool isGasShutOff;
+    public bool isBreakerShutOff;
+
+    // Stage 4 & 5
+    public bool isPlanterMoved;
+    public bool isNeighborTreated;
+    public bool isSignDodged;
 }
 
 /// <summary>
@@ -51,6 +79,15 @@ public class GameTimelineManager : MonoBehaviour
     [SerializeField] private float stage3Duration = 30f;
     private float currentStageTimer = 0f;
     private bool isTimerRunning = false;
+
+    [Header("Time Loop Limits & Settings")]
+    [SerializeField] private int maxRewindsPerGame = 3;
+    [SerializeField] private int rewindsUsed = 0;
+
+    public int RewindsRemaining => Mathf.Max(0, maxRewindsPerGame - rewindsUsed);
+    public int MaxRewinds => maxRewindsPerGame;
+
+    private Stack<TimelineSnapshot> actionHistory = new Stack<TimelineSnapshot>();
 
     [Header("HUD References")]
     [SerializeField] private TMP_Text timerText;
@@ -114,6 +151,7 @@ public class GameTimelineManager : MonoBehaviour
         if (!hasStarted)
         {
             hasStarted = true;
+            EnsureTimeRewindController();
             if (rewindPanel != null) rewindPanel.SetActive(false);
             StartStage1();
         }
@@ -121,6 +159,13 @@ public class GameTimelineManager : MonoBehaviour
 
     private void Update()
     {
+#if UNITY_EDITOR
+        if (Keyboard.current != null && Keyboard.current.kKey.wasPressedThisFrame)
+        {
+            TriggerRewind("TEST REWIND: Electric spark caused gas explosion! Undoing fatal action and adding 5 seconds.");
+        }
+#endif
+
         if (isTimerRunning)
         {
             currentStageTimer -= Time.deltaTime;
@@ -135,6 +180,53 @@ public class GameTimelineManager : MonoBehaviour
         }
     }
 
+    #region --- ACTION SNAPSHOT SYSTEM ---
+
+    public void RecordActionSnapshot(string actionDescription)
+    {
+        Vector3 pos = playerMovement != null ? playerMovement.transform.position : new Vector3(-9.6f, -2.2f, 0f);
+        TimelineSnapshot snapshot = new TimelineSnapshot
+        {
+            actionDescription = actionDescription,
+            stage = currentStage,
+            stageTimer = currentStageTimer,
+            playerPosition = pos,
+
+            isBookshelfAnchored = isBookshelfAnchored,
+            isPaintingRemoved = isPaintingRemoved,
+            isCandleExtinguished = isCandleExtinguished,
+            hasFlashlight = hasFlashlight,
+            hasFirstAidKit = hasFirstAidKit,
+            inventoryItems = InventoryManager.GetItemsCopy(),
+
+            isCabinetSecured = isCabinetSecured,
+            isGasShutOff = isGasShutOff,
+            isBreakerShutOff = isBreakerShutOff,
+
+            isPlanterMoved = isPlanterMoved,
+            isNeighborTreated = isNeighborTreated,
+            isSignDodged = isSignDodged
+        };
+        actionHistory.Push(snapshot);
+        Debug.Log($"[Timeline] Recorded action snapshot: '{actionDescription}' (History depth: {actionHistory.Count})");
+    }
+
+    public float CalculateRewindDuration(GameStage failedStage, string educationalReason)
+    {
+        // Major preparation mistakes (unaddressed painting / candle) or stage timeouts get 15s.
+        // Quick reaction mistakes (switch spark, door rush, cabinet QTE) get 5s.
+        bool isMajorPrepOrTimeout =
+            failedStage == GameStage.Stage1_Preparation ||
+            educationalReason.IndexOf("painting", StringComparison.OrdinalIgnoreCase) >= 0 ||
+            educationalReason.IndexOf("candle", StringComparison.OrdinalIgnoreCase) >= 0 ||
+            educationalReason.IndexOf("TIME RAN OUT", StringComparison.OrdinalIgnoreCase) >= 0 ||
+            educationalReason.IndexOf("Lingered too long", StringComparison.OrdinalIgnoreCase) >= 0;
+
+        return isMajorPrepOrTimeout ? 15f : 5f;
+    }
+
+    #endregion
+
     #region --- STAGE 1: PREPARATION ---
 
     public void StartStage1()
@@ -145,6 +237,11 @@ public class GameTimelineManager : MonoBehaviour
 
         if (playerMovement != null) playerMovement.enabled = true;
 
+        if (actionHistory.Count == 0)
+        {
+            RecordActionSnapshot("Stage 1 Initial Start");
+        }
+
         SetObjectiveText("STAGE 1: Fix room hazards & pack flashlight + first-aid kit!");
         UpdateInventoryHUD();
         OnStageChanged?.Invoke(currentStage);
@@ -154,6 +251,10 @@ public class GameTimelineManager : MonoBehaviour
 
     public void SetBookshelfAnchored(bool anchored)
     {
+        if (currentStage != GameStage.Rewinding && isBookshelfAnchored != anchored)
+        {
+            RecordActionSnapshot($"Bookshelf Anchored: {anchored}");
+        }
         isBookshelfAnchored = anchored;
         Debug.Log($"[Timeline] Bookshelf Anchored: {anchored}");
         UpdateInventoryHUD();
@@ -162,6 +263,10 @@ public class GameTimelineManager : MonoBehaviour
 
     public void SetPaintingRemoved(bool removed)
     {
+        if (currentStage != GameStage.Rewinding && isPaintingRemoved != removed)
+        {
+            RecordActionSnapshot($"Painting Removed: {removed}");
+        }
         isPaintingRemoved = removed;
         Debug.Log($"[Timeline] Painting Removed: {removed}");
         UpdateInventoryHUD();
@@ -171,6 +276,10 @@ public class GameTimelineManager : MonoBehaviour
 
     public void SetCandleExtinguished(bool extinguished)
     {
+        if (currentStage != GameStage.Rewinding && isCandleExtinguished != extinguished)
+        {
+            RecordActionSnapshot($"Candle Extinguished: {extinguished}");
+        }
         isCandleExtinguished = extinguished;
         Debug.Log($"[Timeline] Candle Extinguished: {extinguished}");
         UpdateInventoryHUD();
@@ -180,6 +289,10 @@ public class GameTimelineManager : MonoBehaviour
 
     public void CollectFlashlight()
     {
+        if (currentStage != GameStage.Rewinding && !hasFlashlight)
+        {
+            RecordActionSnapshot("Collected Flashlight");
+        }
         hasFlashlight = true;
         Debug.Log("[Timeline] Flashlight collected!");
         UpdateInventoryHUD();
@@ -188,6 +301,10 @@ public class GameTimelineManager : MonoBehaviour
 
     public void CollectFirstAidKit()
     {
+        if (currentStage != GameStage.Rewinding && !hasFirstAidKit)
+        {
+            RecordActionSnapshot("Collected First Aid Kit");
+        }
         hasFirstAidKit = true;
         Debug.Log("[Timeline] First-Aid Kit collected!");
         UpdateInventoryHUD();
@@ -209,6 +326,11 @@ public class GameTimelineManager : MonoBehaviour
 
     public void StartStage2()
     {
+        if (currentStage != GameStage.Rewinding)
+        {
+            RecordActionSnapshot("Earthquake Tremor Began");
+        }
+
         currentStage = GameStage.Stage2_Tremor;
         isTimerRunning = false;
 
@@ -268,6 +390,11 @@ public class GameTimelineManager : MonoBehaviour
 
     private void HandleStage2Choice(string actionId)
     {
+        if (currentStage != GameStage.Rewinding)
+        {
+            RecordActionSnapshot($"Tremor Choice: {actionId}");
+        }
+
         bool choseDesk = actionId.Equals("desk", StringComparison.OrdinalIgnoreCase) || 
                          actionId.Equals("DropCover", StringComparison.OrdinalIgnoreCase) ||
                          actionId.Equals("cover", StringComparison.OrdinalIgnoreCase);
@@ -321,6 +448,11 @@ public class GameTimelineManager : MonoBehaviour
 
     public void StartStage3()
     {
+        if (currentStage != GameStage.Rewinding)
+        {
+            RecordActionSnapshot("Stage 3 Utilities Began");
+        }
+
         currentStage = GameStage.Stage3_Utilities;
         currentStageTimer = stage3Duration;
         isTimerRunning = true;
@@ -334,6 +466,11 @@ public class GameTimelineManager : MonoBehaviour
 
     public void HandleCabinetQTEResult(bool success)
     {
+        if (currentStage != GameStage.Rewinding)
+        {
+            RecordActionSnapshot($"Cabinet QTE: {success}");
+        }
+
         isCabinetSecured = success;
         if (success)
         {
@@ -347,6 +484,11 @@ public class GameTimelineManager : MonoBehaviour
 
     public void HandleUtilityAction(string action)
     {
+        if (currentStage != GameStage.Rewinding)
+        {
+            RecordActionSnapshot($"Utility Action: {action}");
+        }
+
         if (action == "LightSwitch")
         {
             TriggerRewind("FATAL EXPLOSION: The electrical light switch sparked and ignited the leaking gas! NEVER flip light switches or create electrical sparks when you smell gas!");
@@ -377,6 +519,11 @@ public class GameTimelineManager : MonoBehaviour
 
     public void AdvanceToStage4()
     {
+        if (currentStage != GameStage.Rewinding)
+        {
+            RecordActionSnapshot("Stage 4 Stairwell Began");
+        }
+
         currentStage = GameStage.Stage4_Stairwell;
         isTimerRunning = false;
         SetObjectiveText("STAGE 4: Navigate dark stairwell & assist Mr. Ahmet.");
@@ -422,6 +569,11 @@ public class GameTimelineManager : MonoBehaviour
 
     public void AdvanceToStage5()
     {
+        if (currentStage != GameStage.Rewinding)
+        {
+            RecordActionSnapshot("Stage 5 Street Began");
+        }
+
         currentStage = GameStage.Stage5_StreetFinale;
         isTimerRunning = false;
         SetObjectiveText("STAGE 5: Navigate street aftershock & reach Toplanma Alanı!");
@@ -431,6 +583,11 @@ public class GameTimelineManager : MonoBehaviour
 
     public void HandleStreetSignQTEResult(bool success)
     {
+        if (currentStage != GameStage.Rewinding)
+        {
+            RecordActionSnapshot($"Sign QTE: {success}");
+        }
+
         isSignDodged = success;
         if (success)
         {
@@ -444,6 +601,10 @@ public class GameTimelineManager : MonoBehaviour
 
     public void HandleStreetRumorChoice(bool choseCar)
     {
+        if (currentStage != GameStage.Rewinding)
+        {
+            RecordActionSnapshot($"Rumor Choice: ChoseCar={choseCar}");
+        }
         if (choseCar)
         {
             TriggerRewind("GRIDLOCK TRAP: You and hundreds of panicked drivers gridlocked the mountain road, blocking emergency rescue vehicles! Stay out of cars!");
@@ -467,10 +628,22 @@ public class GameTimelineManager : MonoBehaviour
     {
         if (currentStage == GameStage.Rewinding) return;
 
+        // Check if all available time loop rewinds have been exhausted
+        if (rewindsUsed >= maxRewindsPerGame)
+        {
+            Debug.LogWarning($"<color=red>[TIME LOOP] Max rewinds reached ({rewindsUsed}/{maxRewindsPerGame})! Timeline Collapsed.</color>");
+            TriggerGameOverSequence(educationalReason);
+            return;
+        }
+
+        rewindsUsed++;
+        int loopsRemaining = maxRewindsPerGame - rewindsUsed;
+
+        GameStage failedStage = currentStage;
         currentStage = GameStage.Rewinding;
         isTimerRunning = false;
 
-        Debug.Log($"<color=red>[TIME LOOP REWIND] {educationalReason}</color>");
+        Debug.Log($"<color=red>[TIME LOOP REWIND] (Used: {rewindsUsed}/{maxRewindsPerGame}, Remaining: {loopsRemaining}) {educationalReason}</color>");
 
         if (playerMovement != null)
         {
@@ -479,40 +652,276 @@ public class GameTimelineManager : MonoBehaviour
         }
         InventorySelection.ResetSelection();
         if (QTEManager.Instance != null) QTEManager.Instance.CancelAll();
+        if (roomCamera != null) roomCamera.StopEarthquake();
+        if (stage2ChoiceGroup != null) stage2ChoiceGroup.gameObject.SetActive(false);
 
-        StartCoroutine(RewindRoutine(educationalReason));
+        // Calculate dynamic rewind duration:
+        // Major prep mistakes (unaddressed painting / candle) or stage timeouts get 15s.
+        // Quick reaction mistakes (switch spark, door rush, cabinet QTE) get 5s.
+        float addedDuration = CalculateRewindDuration(failedStage, educationalReason);
+
+        EnsureTimeRewindController();
+        TimeRewindController.Instance.PlayTimeRewind(
+            educationalReason: educationalReason,
+            addedSeconds: addedDuration,
+            remainingLoops: loopsRemaining,
+            maxLoops: maxRewindsPerGame,
+            onRewindStateRestore: () =>
+            {
+                UndoLastFatalActionAndRestore(failedStage, educationalReason, addedDuration);
+            },
+            onComplete: () =>
+            {
+                if (playerMovement != null && currentStage != GameStage.Stage2_Tremor)
+                {
+                    playerMovement.enabled = true;
+                }
+            }
+        );
     }
 
-    private IEnumerator RewindRoutine(string educationalReason)
+    private void TriggerGameOverSequence(string educationalReason)
     {
-        if (rewindPanel != null)
+        currentStage = GameStage.Rewinding;
+        isTimerRunning = false;
+
+        if (playerMovement != null)
         {
-            rewindPanel.SetActive(true);
-            if (rewindReasonText != null)
+            playerMovement.ResetFlashlight();
+            playerMovement.enabled = false;
+        }
+        InventorySelection.ResetSelection();
+        if (QTEManager.Instance != null) QTEManager.Instance.CancelAll();
+        if (roomCamera != null) roomCamera.StopEarthquake();
+        if (stage2ChoiceGroup != null) stage2ChoiceGroup.gameObject.SetActive(false);
+
+        EnsureTimeRewindController();
+        TimeRewindController.Instance.PlayGameOverSequence(
+            educationalReason: educationalReason,
+            onRestart: () =>
             {
-                rewindReasonText.text = educationalReason;
+                ResetToCheckpoint();
+            }
+        );
+    }
+
+    private void EnsureTimeRewindController()
+    {
+        if (TimeRewindController.Instance == null)
+        {
+            GameObject obj = new GameObject("TimeRewindController");
+            obj.AddComponent<TimeRewindController>();
+        }
+    }
+
+    private void UndoLastFatalActionAndRestore(GameStage failedStage, string educationalReason, float addedDuration)
+    {
+        // 1. Retrieve the snapshot before the last fatal action was performed
+        TimelineSnapshot snapshot;
+        if (actionHistory.Count > 1)
+        {
+            snapshot = actionHistory.Pop();
+            Debug.Log($"<color=yellow>[Timeline] Reverting last action '{snapshot.actionDescription}' as if it never happened!</color>");
+        }
+        else if (actionHistory.Count == 1)
+        {
+            snapshot = actionHistory.Peek();
+            Debug.Log($"<color=yellow>[Timeline] Restoring to initial baseline state '{snapshot.actionDescription}'</color>");
+        }
+        else
+        {
+            snapshot = new TimelineSnapshot
+            {
+                actionDescription = "Baseline State",
+                stage = GameStage.Stage1_Preparation,
+                stageTimer = stage1Duration,
+                playerPosition = new Vector3(-9.6f, -2.2f, 0f),
+                inventoryItems = new List<string>()
+            };
+        }
+
+        // 2. Restore logical flags from snapshot
+        isBookshelfAnchored = snapshot.isBookshelfAnchored;
+        isPaintingRemoved = snapshot.isPaintingRemoved;
+        isCandleExtinguished = snapshot.isCandleExtinguished;
+        hasFlashlight = snapshot.hasFlashlight;
+        hasFirstAidKit = snapshot.hasFirstAidKit;
+
+        isCabinetSecured = snapshot.isCabinetSecured;
+        isGasShutOff = snapshot.isGasShutOff;
+        isBreakerShutOff = snapshot.isBreakerShutOff;
+
+        isPlanterMoved = snapshot.isPlanterMoved;
+        isNeighborTreated = snapshot.isNeighborTreated;
+        isSignDodged = snapshot.isSignDodged;
+
+        // 3. Restore inventory items
+        InventoryManager.SetItems(snapshot.inventoryItems);
+        InventorySelection.ResetSelection();
+
+        // 4. Physical / Visual restoration of room objects
+        // (a) Restore RoomItemInteractable items (Painting, Flashlight, Medkit)
+        var roomItems = FindObjectsByType<RoomItemInteractable>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        foreach (var item in roomItems)
+        {
+            if (item.ItemType == ItemPickupType.RemovePainting)
+            {
+                item.RestoreState(isPaintingRemoved);
+            }
+            else if (item.ItemType == ItemPickupType.Flashlight)
+            {
+                item.RestoreState(hasFlashlight);
+            }
+            else if (item.ItemType == ItemPickupType.FirstAidKit)
+            {
+                item.RestoreState(hasFirstAidKit);
             }
         }
 
-        float countdown = rewindDelay;
-        while (countdown > 0f)
+        // (b) Restore Bookshelf state
+        var bookshelves = FindObjectsByType<BookshelfAnchorInteractable>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        foreach (var b in bookshelves)
         {
-            if (rewindCountdownText != null)
-            {
-                rewindCountdownText.text = $"Rewinding Timeline... {countdown:F1}s";
-            }
-            yield return null;
-            countdown -= Time.unscaledDeltaTime;
+            b.RestoreState(isBookshelfAnchored);
         }
 
-        if (rewindPanel != null) rewindPanel.SetActive(false);
+        // (c) Sync Table & Painting position and sprite via InteractionZones
+        var zones = FindObjectsByType<InteractionZone>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        foreach (var z in zones)
+        {
+            z.CheckCompletionStatus();
+        }
 
-        // Reset timeline back to Stage 1 checkpoint
-        ResetToCheckpoint();
+        // 5. Restore Stage & Timer with dynamic added time
+        bool wasCandleOrPaintingTremorFail = failedStage == GameStage.Stage2_Tremor &&
+            (educationalReason.IndexOf("candle", StringComparison.OrdinalIgnoreCase) >= 0 ||
+             educationalReason.IndexOf("painting", StringComparison.OrdinalIgnoreCase) >= 0);
+
+        if (wasCandleOrPaintingTremorFail)
+        {
+            // Hazard was left unaddressed in Stage 1 -> Rewind to Stage 1 Preparation with variable bonus (e.g. +15s)
+            currentStage = GameStage.Stage1_Preparation;
+            currentStageTimer = Mathf.Max(snapshot.stageTimer + addedDuration, addedDuration);
+            isTimerRunning = true;
+            SetObjectiveText($"TIME REWOUND (+{addedDuration:0}s)! Fix room hazards before the earthquake strikes!");
+            ReEnableStage1Interactions();
+            if (playerMovement != null)
+            {
+                playerMovement.enabled = true;
+                playerMovement.transform.position = new Vector3(-9.6f, -2.2f, 0f);
+            }
+        }
+        else if (failedStage == GameStage.Stage1_Preparation)
+        {
+            currentStage = GameStage.Stage1_Preparation;
+            currentStageTimer = Mathf.Max(snapshot.stageTimer + addedDuration, addedDuration);
+            isTimerRunning = true;
+            SetObjectiveText($"STAGE 1 (+{addedDuration:0}s): Fix room hazards & pack flashlight + first-aid kit!");
+            ReEnableStage1Interactions();
+            if (playerMovement != null)
+            {
+                playerMovement.enabled = true;
+                playerMovement.transform.position = snapshot.playerPosition;
+            }
+        }
+        else if (failedStage == GameStage.Stage2_Tremor)
+        {
+            // Player ran for the door or froze: That fatal action never happened!
+            // Re-present choice with added decision time
+            currentStage = GameStage.Stage2_Tremor;
+            isTimerRunning = false;
+            stage2TremorDuration += addedDuration;
+            SetObjectiveText("EARTHQUAKE STRIKES! MAKE YOUR DECISION!");
+
+            if (roomCamera != null)
+            {
+                roomCamera.StartEarthquake();
+            }
+
+            if (playerMovement != null)
+            {
+                playerMovement.enabled = false;
+                playerMovement.transform.position = snapshot.playerPosition;
+            }
+
+            if (stage2ChoiceGroup != null)
+            {
+                stage2ChoiceGroup.gameObject.SetActive(true);
+                stage2ChoiceGroup.PresentChoices(
+                    headerTitle: "EARTHQUAKE HITS! CHOOSE FAST!",
+                    duration: stage2TremorDuration,
+                    onChoice: HandleStage2Choice,
+                    onTimeout: HandleStage2Timeout
+                );
+            }
+        }
+        else if (failedStage == GameStage.Stage3_Utilities)
+        {
+            currentStage = GameStage.Stage3_Utilities;
+            currentStageTimer = Mathf.Max(snapshot.stageTimer + addedDuration, addedDuration);
+            isTimerRunning = true;
+            SetObjectiveText($"STAGE 3 (+{addedDuration:0}s): Gas leak detected! Secure cabinet & shut off utilities safely.");
+
+            if (playerMovement != null)
+            {
+                playerMovement.enabled = true;
+                playerMovement.transform.position = snapshot.playerPosition;
+            }
+        }
+        else if (failedStage == GameStage.Stage4_Stairwell)
+        {
+            currentStage = GameStage.Stage4_Stairwell;
+            currentStageTimer = Mathf.Max(snapshot.stageTimer + addedDuration, addedDuration);
+            isTimerRunning = true;
+            SetObjectiveText($"STAGE 4 (+{addedDuration:0}s): Navigate dark stairwell & assist Mr. Ahmet.");
+            if (playerMovement != null)
+            {
+                playerMovement.enabled = true;
+                playerMovement.transform.position = snapshot.playerPosition;
+            }
+        }
+        else if (failedStage == GameStage.Stage5_StreetFinale)
+        {
+            currentStage = GameStage.Stage5_StreetFinale;
+            currentStageTimer = Mathf.Max(snapshot.stageTimer + addedDuration, addedDuration);
+            isTimerRunning = true;
+            SetObjectiveText($"STAGE 5 (+{addedDuration:0}s): Navigate street aftershock & reach Toplanma Alanı!");
+            if (playerMovement != null)
+            {
+                playerMovement.enabled = true;
+                playerMovement.transform.position = snapshot.playerPosition;
+            }
+        }
+
+        UpdateTimerHUD();
+        UpdateInventoryHUD();
+        OnStateUpdated?.Invoke();
+        OnStageChanged?.Invoke(currentStage);
+    }
+
+    private void ReEnableStage1Interactions()
+    {
+        var zones = FindObjectsByType<InteractionZone>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        foreach (var z in zones) z.SetInteractable(true);
+
+        var roomItems = FindObjectsByType<RoomItemInteractable>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        foreach (var r in roomItems) r.SetInteractable(true);
+
+        var bookshelves = FindObjectsByType<BookshelfAnchorInteractable>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        foreach (var b in bookshelves) b.SetInteractable(true);
+
+        if (InteractionManager.Instance != null)
+        {
+            InteractionManager.Instance.ResetPromptsSystem();
+        }
     }
 
     public void ResetToCheckpoint()
     {
+        // Reset time loop counters & history
+        rewindsUsed = 0;
+        actionHistory.Clear();
+
         // Reset flags
         isBookshelfAnchored = false;
         isPaintingRemoved = false;
@@ -547,16 +956,7 @@ public class GameTimelineManager : MonoBehaviour
         BookshelfSceneController.ResetToolState();
 
         // Re-enable all interaction zones
-        var zones = FindObjectsByType<InteractionZone>(FindObjectsInactive.Include, FindObjectsSortMode.None);
-        foreach (var z in zones)
-        {
-            z.SetInteractable(true);
-        }
-
-        if (InteractionManager.Instance != null)
-        {
-            InteractionManager.Instance.ResetPromptsSystem();
-        }
+        ReEnableStage1Interactions();
 
         PlayerMovement.ClearSavedPosition();
         if (playerMovement != null)

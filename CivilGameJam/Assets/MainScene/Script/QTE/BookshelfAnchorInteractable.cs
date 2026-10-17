@@ -196,4 +196,14 @@ public class BookshelfAnchorInteractable : MonoBehaviour
         if (visualSecuredIndicator != null) visualSecuredIndicator.SetActive(false);
         if (interactionPrompt != null) interactionPrompt.SetActive(false);
     }
+
+    public void RestoreState(bool anchored)
+    {
+        isAnchored = anchored;
+        isQTEActive = false;
+        isInteractable = !anchored;
+        playerInRange = false;
+        if (visualSecuredIndicator != null) visualSecuredIndicator.SetActive(anchored);
+        if (interactionPrompt != null) interactionPrompt.SetActive(false);
+    }
 }

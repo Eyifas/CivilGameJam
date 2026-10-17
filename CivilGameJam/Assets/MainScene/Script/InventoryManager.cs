@@ -111,4 +111,24 @@ public static class InventoryManager
     {
         return items;
     }
+
+    public static List<string> GetItemsCopy()
+    {
+        return new List<string>(items);
+    }
+
+    public static void SetItems(IEnumerable<string> newItems)
+    {
+        items.Clear();
+        if (newItems != null)
+        {
+            foreach (var item in newItems)
+            {
+                if (!string.IsNullOrEmpty(item) && !items.Contains(item))
+                {
+                    items.Add(item);
+                }
+            }
+        }
+    }
 }

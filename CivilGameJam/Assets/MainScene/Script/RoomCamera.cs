@@ -52,4 +52,9 @@ public class RoomCamera : MonoBehaviour
     {
         shakeTimeRemaining = shakeDuration;
     }
+
+    public void StopEarthquake()
+    {
+        shakeTimeRemaining = 0f;
+    }
 }
