@@ -24,7 +24,9 @@ public class TimeRewindController : MonoBehaviour
     [Header("Animation Durations")]
     [SerializeField] private float eyeCloseDuration = 0.65f;
     [SerializeField] private float eyeOpenDuration = 0.5f;
-    [SerializeField] private float rewindSpinDuration = 2.2f;
+    [SerializeField] private float rewindSpinDuration = 2.4f;
+    [Tooltip("How long the educational reason and restored time remain on screen for the player to read before returning to gameplay")]
+    [SerializeField] private float educationalReasonHoldDuration = 3.5f;
 
     // UI Structure
     private Canvas overlayCanvas;
@@ -822,19 +824,33 @@ public class TimeRewindController : MonoBehaviour
         if (bonusBadgeText != null)
         {
             bonusBadgeText.gameObject.SetActive(true);
-            bonusBadgeText.text = $"<color=#FFD700>+{addedSeconds:0} SECONDS RESTORED</color>";
+            bonusBadgeText.text = $"<color=#FFD700>+{addedSeconds:0} SECONDS RESTORED</color>\n<size=55%><color=#D0D0D0>[Space / Click to Continue]</color></size>";
             bonusBadgeText.transform.localScale = Vector3.one * 1.35f;
         }
 
-        // Hold clock for brief recognition
+        // Hold clock & educational reason for comfortable reading before returning to live game
         float holdTimer = 0f;
-        while (holdTimer < 0.55f)
+        while (holdTimer < educationalReasonHoldDuration)
         {
             holdTimer += Time.unscaledDeltaTime;
             if (bonusBadgeText != null)
             {
                 bonusBadgeText.transform.localScale = Vector3.Lerp(bonusBadgeText.transform.localScale, Vector3.one, Time.unscaledDeltaTime * 6f);
             }
+
+            // Allow advancing if the player finished reading early (after at least 0.75s to avoid accidental clicks)
+            if (holdTimer > 0.75f)
+            {
+                if (Keyboard.current != null && (Keyboard.current.spaceKey.wasPressedThisFrame || Keyboard.current.eKey.wasPressedThisFrame))
+                {
+                    break;
+                }
+                if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame)
+                {
+                    break;
+                }
+            }
+
             yield return null;
         }
 

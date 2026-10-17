@@ -145,6 +145,33 @@ public class GameTimelineManager : MonoBehaviour
         if (playerMovement == null) playerMovement = FindFirstObjectByType<PlayerMovement>();
         if (stage2ChoiceGroup == null) stage2ChoiceGroup = FindFirstObjectByType<WorldChoiceGroup>(FindObjectsInactive.Include);
         EnsureCupboardTriggerZone();
+        EnsureHazardVisualManager();
+    }
+
+    private void EnsureHazardVisualManager()
+    {
+        if (HazardVisualManager.Instance == null)
+        {
+            var go = GameObject.Find("HazardVisualManager");
+            if (go == null)
+            {
+                go = new GameObject("HazardVisualManager");
+            }
+            if (!go.TryGetComponent<HazardVisualManager>(out var hvm))
+            {
+                hvm = go.AddComponent<HazardVisualManager>();
+            }
+        }
+    }
+
+    public void PauseTimer()
+    {
+        isTimerRunning = false;
+    }
+
+    public void ResumeTimer()
+    {
+        isTimerRunning = true;
     }
 
     private void EnsureCupboardTriggerZone()
@@ -644,7 +671,28 @@ public class GameTimelineManager : MonoBehaviour
 
     public void TriggerRewind(string educationalReason)
     {
+        TriggerRewind(educationalReason, false, null, null);
+    }
+
+    public void TriggerRewind(string educationalReason, Action onStateRestore, Action onComplete = null)
+    {
+        TriggerRewind(educationalReason, false, onStateRestore, onComplete);
+    }
+
+    public void TriggerRewind(string educationalReason, bool isFromVisual, Action onStateRestore = null, Action onComplete = null)
+    {
         if (currentStage == GameStage.Rewinding) return;
+
+        // If not already triggered from a hazard visual, trigger its visual sequence first
+        if (!isFromVisual && HazardVisualManager.Instance != null)
+        {
+            var hazard = HazardVisualManager.Instance.GetHazard(educationalReason);
+            if (hazard != null && !hazard.IsTriggered)
+            {
+                hazard.TriggerSequence();
+                return;
+            }
+        }
 
         // Check if all available time loop rewinds have been exhausted
         if (rewindsUsed >= maxRewindsPerGame)
@@ -686,10 +734,14 @@ public class GameTimelineManager : MonoBehaviour
             maxLoops: maxRewindsPerGame,
             onRewindStateRestore: () =>
             {
+                onStateRestore?.Invoke();
                 UndoLastFatalActionAndRestore(failedStage, educationalReason, addedDuration);
+                Time.timeScale = 1f;
             },
             onComplete: () =>
             {
+                Time.timeScale = 1f;
+                onComplete?.Invoke();
                 if (playerMovement != null && currentStage != GameStage.Stage2_Tremor)
                 {
                     playerMovement.enabled = true;

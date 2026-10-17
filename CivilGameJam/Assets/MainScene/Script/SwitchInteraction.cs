@@ -4,20 +4,72 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
+/// <summary>
+/// Reusable hazard death visual & rewind controller.
+/// Displays a hazard/death illustration on sorting order 20 (on top of everything),
+/// hides the game UI (timer, inventory, HUD) for full screen focus,
+/// holds the visual for dramatic effect, then initiates the time rewind loop.
+/// 
+/// Can be used:
+/// 1. As an interactive trigger with [E] (e.g., light switch).
+/// 2. As an automatic hazard trigger via code (e.g., candle fire, falling painting) using TriggerSequence().
+/// 3. As a global static one-liner: SwitchInteraction.PlayHazardDeathVisual(...).
+/// </summary>
 public class SwitchInteraction : MonoBehaviour
 {
+    [Header("Visual Object")]
+    [Tooltip("The death/failure illustration to show on screen")]
     [SerializeField] private GameObject switchImage;
 
+    [Header("Trigger Mode")]
+    [Tooltip("If true, requires player to enter 2D trigger and press [E]. If false, only triggers when called automatically via code.")]
+    [SerializeField] private bool triggerOnInteract = true;
+
     [Header("Death Settings")]
-    [SerializeField] private float imageDuration = 1.5f;
+    [Tooltip("How long the death image is shown alone before rewind begins")]
+    [SerializeField] private float imageDuration = 2.2f;
+
+    [Tooltip("The educational explanation displayed on the rewind time loop screen")]
+    [TextArea(2, 4)]
+    [SerializeField] private string educationalReason = "ELECTRICAL HAZARD: You used the light switch after the earthquake while a gas leak was present.";
+
+    [Tooltip("How many seconds are added back to the timer upon rewind (default: 5s, or 15s for candle/prep)")]
+    [SerializeField] private float rewindDuration = 5f;
 
     [Header("Sorting / Layer Settings")]
     [Tooltip("Sorting Order (Layer) to display switchImage on top of everything (Default: 20)")]
     [SerializeField] private int sortingOrder = 20;
     [SerializeField] private string sortingLayerName = "Default";
 
+    [Header("Interaction Prompt")]
+    [Tooltip("Visual hint showing E button and label text next to it")]
+    [SerializeField] private GameObject interactionPrompt;
+    [SerializeField] private string promptLabel = "Flip the Switch";
+    [SerializeField] private Vector3 promptOffset = new Vector3(0f, 1.1f, 0f);
+
     private bool playerInside = false;
     private bool triggered = false;
+
+    public bool IsTriggered => triggered;
+    public string EducationalReason => educationalReason;
+    public GameObject InteractionPrompt => interactionPrompt;
+    public string PromptLabel => promptLabel;
+
+    public void SetTriggerOnInteract(bool val) => triggerOnInteract = val;
+    public void SetEducationalReason(string reason) => educationalReason = reason;
+    public void SetRewindDuration(float duration) => rewindDuration = duration;
+    public void SetSortingOrder(int order) => sortingOrder = order;
+    public void SetImageDuration(float dur) => imageDuration = dur;
+    public void SetSwitchImage(GameObject img) => switchImage = img;
+    public void SetPromptLabel(string label)
+    {
+        promptLabel = label;
+        if (interactionPrompt != null)
+        {
+            var labelComp = interactionPrompt.GetComponent<InteractionPromptLabel>();
+            if (labelComp != null) labelComp.SetLabel(promptLabel);
+        }
+    }
 
     private readonly List<Canvas> disabledCanvases = new List<Canvas>();
     private readonly List<GameObject> disabledObjects = new List<GameObject>();
@@ -37,16 +89,30 @@ public class SwitchInteraction : MonoBehaviour
         {
             switchImage.SetActive(false);
         }
+
+        EnsureInteractionPrompt();
     }
 
     private void OnValidate()
     {
         ApplySortingOrder(switchImage);
+        if (interactionPrompt != null)
+        {
+            var labelComp = interactionPrompt.GetComponent<InteractionPromptLabel>();
+            if (labelComp != null)
+            {
+                labelComp.SetLabel(promptLabel);
+            }
+        }
     }
 
     private void OnDisable()
     {
         RestoreGameUI();
+        if (interactionPrompt != null)
+        {
+            interactionPrompt.SetActive(false);
+        }
     }
 
     private void EnsureSwitchImageReference()
@@ -55,9 +121,17 @@ public class SwitchInteraction : MonoBehaviour
         {
             if (transform.childCount > 0)
             {
-                switchImage = transform.GetChild(0).gameObject;
+                for (int i = 0; i < transform.childCount; i++)
+                {
+                    var child = transform.GetChild(i).gameObject;
+                    if (child.name != "InteractionPrompt" && child.name != "E Button")
+                    {
+                        switchImage = child;
+                        break;
+                    }
+                }
             }
-            else
+            if (switchImage == null)
             {
                 var candidate = GameObject.Find("1000000106_0") ??
                                 GameObject.Find("SwitchImage") ??
@@ -69,6 +143,91 @@ public class SwitchInteraction : MonoBehaviour
                     switchImage = candidate;
                 }
             }
+        }
+    }
+
+    public void EnsureInteractionPrompt()
+    {
+        if (!triggerOnInteract) return;
+
+        if (interactionPrompt == null)
+        {
+            var child = transform.Find("InteractionPrompt") ?? transform.Find("E Button");
+            if (child != null)
+            {
+                interactionPrompt = child.gameObject;
+            }
+        }
+
+        if (interactionPrompt == null)
+        {
+            interactionPrompt = CreateInteractionPrompt();
+        }
+
+        if (interactionPrompt != null)
+        {
+            var labelComp = interactionPrompt.GetComponent<InteractionPromptLabel>();
+            if (labelComp == null) labelComp = interactionPrompt.AddComponent<InteractionPromptLabel>();
+            labelComp.SetLabel(promptLabel);
+            labelComp.Offset = new Vector3(0.5f, 0f, 0f);
+            labelComp.FontSize = 5f;
+            labelComp.TextColor = Color.white;
+
+            interactionPrompt.SetActive(false);
+        }
+    }
+
+    private GameObject CreateInteractionPrompt()
+    {
+        GameObject promptObj = new GameObject("InteractionPrompt");
+        promptObj.transform.SetParent(transform, false);
+        promptObj.transform.localPosition = promptOffset;
+        promptObj.transform.localScale = new Vector3(0.55f, 0.55f, 1f);
+
+        var sr = promptObj.AddComponent<SpriteRenderer>();
+        sr.sprite = GetEButtonSprite();
+        sr.sortingLayerName = sortingLayerName;
+        sr.sortingOrder = 10;
+
+        var labelComp = promptObj.AddComponent<InteractionPromptLabel>();
+        labelComp.SetLabel(promptLabel);
+        labelComp.Offset = new Vector3(0.5f, 0f, 0f);
+        labelComp.FontSize = 5f;
+        labelComp.TextColor = Color.white;
+
+        return promptObj;
+    }
+
+    private Sprite GetEButtonSprite()
+    {
+        var sprite = Resources.Load<Sprite>("EButton");
+        if (sprite != null) return sprite;
+
+        var tex = Resources.Load<Texture2D>("EButton");
+        if (tex != null)
+        {
+            return Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f), 100f);
+        }
+
+        var allSprites = Resources.FindObjectsOfTypeAll<Sprite>();
+        foreach (var s in allSprites)
+        {
+            if (s != null && (s.name.IndexOf("E Button", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                              s.name.IndexOf("EButton", StringComparison.OrdinalIgnoreCase) >= 0))
+            {
+                return s;
+            }
+        }
+        return null;
+    }
+
+    [ContextMenu("Create Interaction Prompt in Editor")]
+    public void ManualCreatePromptInEditor()
+    {
+        EnsureInteractionPrompt();
+        if (interactionPrompt != null)
+        {
+            interactionPrompt.SetActive(true);
         }
     }
 
@@ -218,61 +377,188 @@ public class SwitchInteraction : MonoBehaviour
             var c = PersistentCanvas.Instance.GetComponent<Canvas>();
             if (c != null) c.enabled = true;
         }
+
+        if (interactionPrompt != null)
+        {
+            interactionPrompt.SetActive(playerInside && triggerOnInteract && !triggered);
+        }
     }
 
     private void Update()
     {
+        if (!triggerOnInteract) return;
+
         if (playerInside &&
             !triggered &&
             Keyboard.current != null &&
             Keyboard.current.eKey.wasPressedThisFrame)
         {
-            StartCoroutine(SwitchDeathSequence());
+            TriggerSequence();
         }
     }
 
-    private IEnumerator SwitchDeathSequence()
+    /// <summary>
+    /// Programmatically triggers the death sequence (for automatic events like candle fire or falling painting).
+    /// </summary>
+    public void TriggerSequence()
+    {
+        if (triggered) return;
+        StartCoroutine(SwitchDeathSequence(educationalReason, rewindDuration, imageDuration));
+    }
+
+    /// <summary>
+    /// Programmatically triggers the death sequence with custom message, rewind duration, and display time.
+    /// </summary>
+    public void TriggerSequence(string customReason, float customRewindDuration, float customImageDuration = 1.5f)
+    {
+        if (triggered) return;
+        StartCoroutine(SwitchDeathSequence(customReason, customRewindDuration, customImageDuration));
+    }
+
+    /// <summary>
+    /// Static one-liner to play any death visual from anywhere:
+    /// SwitchInteraction.PlayHazardDeathVisual(fireImage, "APARTMENT FIRE...", 15f);
+    /// </summary>
+    public static void PlayHazardDeathVisual(GameObject imageObj, string reason, float rewindSeconds = 5f, float holdDuration = 1.5f, int order = 20)
+    {
+        if (imageObj == null)
+        {
+            if (TimeRewindController.Instance != null)
+            {
+                TimeRewindController.Instance.PlayTimeRewind(reason, rewindSeconds, () => {}, () => {});
+            }
+            return;
+        }
+
+        var comp = imageObj.GetComponent<SwitchInteraction>();
+        if (comp == null)
+        {
+            comp = imageObj.AddComponent<SwitchInteraction>();
+            comp.switchImage = imageObj;
+            comp.triggerOnInteract = false;
+            comp.sortingOrder = order;
+        }
+        comp.TriggerSequence(reason, rewindSeconds, holdDuration);
+    }
+
+    public void CenterOnCamera(GameObject obj)
+    {
+        if (obj == null) return;
+        Camera cam = Camera.main;
+        if (cam == null) cam = FindFirstObjectByType<Camera>();
+        if (cam != null)
+        {
+            Vector3 camPos = cam.transform.position;
+            obj.transform.position = new Vector3(camPos.x, camPos.y, -1f);
+        }
+    }
+
+    private IEnumerator SwitchDeathSequence(string reason, float rewindSeconds, float holdDuration)
     {
         triggered = true;
 
-        // 1. Hide UI so the death visual has full screen focus
-        HideGameUI();
+        // 1. FREEZE / STOP TIME
+        Time.timeScale = 0f;
+        if (GameTimelineManager.Instance != null)
+        {
+            GameTimelineManager.Instance.PauseTimer();
+        }
 
-        // 2. Ölüm görselini aç ve layer 20'ye (en üste) taşı
+        var player = FindFirstObjectByType<PlayerMovement>();
+        if (player != null)
+        {
+            player.enabled = false;
+            var rb = player.GetComponent<Rigidbody2D>();
+            if (rb != null) rb.linearVelocity = Vector2.zero;
+        }
+
+        var cam = FindFirstObjectByType<RoomCamera>();
+        if (cam != null)
+        {
+            cam.StopEarthquake();
+        }
+
+        if (QTEManager.Instance != null)
+        {
+            QTEManager.Instance.CancelAll();
+        }
+
+        var choiceGroup = FindFirstObjectByType<WorldChoiceGroup>(FindObjectsInactive.Include);
+        if (choiceGroup != null)
+        {
+            choiceGroup.gameObject.SetActive(false);
+        }
+
+        // 2. Hide UI so the death visual has full screen focus
+        HideGameUI();
+        if (interactionPrompt != null)
+        {
+            interactionPrompt.SetActive(false);
+        }
+
+        // 3. Center on camera & display on Layer 20
         if (switchImage != null)
         {
+            CenterOnCamera(switchImage);
             ApplySortingOrder(switchImage);
             switchImage.SetActive(true);
         }
 
-        // 3. Görsel 1.5 saniye tek başına görünsün
-        yield return new WaitForSecondsRealtime(imageDuration);
+        // 4. Hold visual for holdDuration seconds while time is frozen
+        yield return new WaitForSecondsRealtime(holdDuration);
 
-        // 4. Görsel HALA açıkken rewind başlasın
-        if (TimeRewindController.Instance != null)
+        // 5. Initiate rewind with visual open until eyelids close
+        if (GameTimelineManager.Instance != null)
         {
-            TimeRewindController.Instance.PlayTimeRewind(
-                "ELECTRICAL HAZARD: You used the light switch after the earthquake while a gas leak was present.",
-                5f,
-
-                onRewindStateRestore: () =>
+            GameTimelineManager.Instance.TriggerRewind(
+                reason,
+                isFromVisual: true,
+                onStateRestore: () =>
                 {
-                    // Ekran tamamen karardıktan sonra resmi kapat
                     if (switchImage != null)
                     {
                         switchImage.SetActive(false);
                     }
 
-                    // Restore UI when the time loop resets
                     RestoreGameUI();
+                    Time.timeScale = 1f;
+                    if (GameTimelineManager.Instance != null)
+                    {
+                        GameTimelineManager.Instance.ResumeTimer();
+                    }
+                    triggered = false;
+                },
+                onComplete: () =>
+                {
+                    Time.timeScale = 1f;
+                    RestoreGameUI();
+                    Debug.Log($"[HazardDeath] Rewind completed for: {reason}");
+                }
+            );
+        }
+        else if (TimeRewindController.Instance != null)
+        {
+            TimeRewindController.Instance.PlayTimeRewind(
+                reason,
+                rewindSeconds,
 
+                onRewindStateRestore: () =>
+                {
+                    if (switchImage != null)
+                    {
+                        switchImage.SetActive(false);
+                    }
+
+                    RestoreGameUI();
+                    Time.timeScale = 1f;
                     triggered = false;
                 },
 
                 onComplete: () =>
                 {
+                    Time.timeScale = 1f;
                     RestoreGameUI();
-                    Debug.Log("Switch death rewind completed.");
+                    Debug.Log($"[HazardDeath] Rewind completed for: {reason}");
                 }
             );
         }
@@ -283,6 +569,7 @@ public class SwitchInteraction : MonoBehaviour
                 switchImage.SetActive(false);
             }
 
+            Time.timeScale = 1f;
             RestoreGameUI();
             triggered = false;
         }
@@ -290,17 +577,25 @@ public class SwitchInteraction : MonoBehaviour
 
     private void OnTriggerEnter2D(Collider2D other)
     {
-        if (other.CompareTag("Player"))
+        if (other.CompareTag("Player") && triggerOnInteract && !triggered)
         {
             playerInside = true;
+            if (interactionPrompt != null)
+            {
+                interactionPrompt.SetActive(true);
+            }
         }
     }
 
     private void OnTriggerExit2D(Collider2D other)
     {
-        if (other.CompareTag("Player"))
+        if (other.CompareTag("Player") && triggerOnInteract)
         {
             playerInside = false;
+            if (interactionPrompt != null)
+            {
+                interactionPrompt.SetActive(false);
+            }
         }
     }
 }
