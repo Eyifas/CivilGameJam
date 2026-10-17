@@ -887,6 +887,16 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ReturnToRoom
   returnSceneName: MainScene
+  labelText: Go Back
+  buttonSprite: {fileID: 0}
+  position: {x: 25, y: 20}
+  iconSize: 50
+  fontSize: 40
+  textColor: {r: 1, g: 1, b: 1, a: 1}
+  hoverColor: {r: 1, g: 0.85, b: 0.2, a: 1}
+  showBackground: 0
+  showOnScreenButton: 1
+  customCanvasButton: {fileID: 0}
 --- !u!1 &1667124545
 GameObject:
   m_ObjectHideFlags: 0

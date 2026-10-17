@@ -20,6 +20,7 @@ public class RoomItemInteractable : MonoBehaviour
 {
     [SerializeField] private ItemPickupType itemType;
     [SerializeField] private GameObject interactionPrompt; // e.g. "Press E to Pick Up / Remove"
+    [SerializeField] private string promptLabel = "";
     [SerializeField] private GameObject itemVisualOnFloor;  // For painting: show it sitting safely on the floor
 
     private bool playerInRange = false;
@@ -38,6 +39,20 @@ public class RoomItemInteractable : MonoBehaviour
 
         if (interactionPrompt != null)
         {
+            var labelComp = interactionPrompt.GetComponent<InteractionPromptLabel>();
+            if (labelComp == null) labelComp = interactionPrompt.AddComponent<InteractionPromptLabel>();
+            if (!string.IsNullOrEmpty(promptLabel))
+            {
+                labelComp.SetLabel(promptLabel);
+            }
+            else
+            {
+                string def = itemType == ItemPickupType.Flashlight ? "Take Flashlight" :
+                             itemType == ItemPickupType.FirstAidKit ? "Take First-Aid Kit" : "Remove Painting";
+                promptLabel = def;
+                labelComp.SetLabel(def);
+            }
+
             if (interactionPrompt.TryGetComponent<Button>(out var btn))
             {
                 btn.onClick.RemoveListener(PerformInteraction);

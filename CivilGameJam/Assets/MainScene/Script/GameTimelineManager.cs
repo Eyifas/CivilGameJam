@@ -31,6 +31,7 @@ public class GameTimelineManager : MonoBehaviour
     [Header("Stage 1: State & Inventory")]
     [SerializeField] private bool isBookshelfAnchored = false;
     [SerializeField] private bool isPaintingRemoved = false;
+    [SerializeField] private bool isCandleExtinguished = false;
     [SerializeField] private bool hasFlashlight = false;
     [SerializeField] private bool hasFirstAidKit = false;
 
@@ -165,6 +166,16 @@ public class GameTimelineManager : MonoBehaviour
         Debug.Log($"[Timeline] Painting Removed: {removed}");
         UpdateInventoryHUD();
         CheckStage1EarlyCompletion();
+        OnStateUpdated?.Invoke();
+    }
+
+    public void SetCandleExtinguished(bool extinguished)
+    {
+        isCandleExtinguished = extinguished;
+        Debug.Log($"[Timeline] Candle Extinguished: {extinguished}");
+        UpdateInventoryHUD();
+        CheckStage1EarlyCompletion();
+        OnStateUpdated?.Invoke();
     }
 
     public void CollectFlashlight()
@@ -185,8 +196,8 @@ public class GameTimelineManager : MonoBehaviour
 
     private void CheckStage1EarlyCompletion()
     {
-        // Optional: If player finished all 4 tasks early, they don't have to wait out the entire 60s
-        if (isBookshelfAnchored && isPaintingRemoved && hasFlashlight && hasFirstAidKit)
+        // If player finished all 5 Stage 1 tasks early
+        if (isBookshelfAnchored && isPaintingRemoved && isCandleExtinguished && hasFlashlight && hasFirstAidKit)
         {
             Debug.Log("[Timeline] All Stage 1 preparations complete! Early trigger ready if needed.");
         }
@@ -272,6 +283,11 @@ public class GameTimelineManager : MonoBehaviour
             {
                 // Painting falls from above the desk!
                 TriggerRewind("FATAL INJURY: The heavy wall painting above the desk fell and shattered glass! Always remove or securely anchor heavy wall hangings over desks/beds!");
+            }
+            else if (!isCandleExtinguished)
+            {
+                // Candle tipped over and ignited apartment!
+                TriggerRewind("APARTMENT FIRE: The lit candle on the desk toppled over during the tremor, igniting the room! Always extinguish open flames and candles before an earthquake strikes!");
             }
             else
             {
@@ -493,6 +509,7 @@ public class GameTimelineManager : MonoBehaviour
         // Reset flags
         isBookshelfAnchored = false;
         isPaintingRemoved = false;
+        isCandleExtinguished = false;
         hasFlashlight = false;
         hasFirstAidKit = false;
         isCabinetSecured = false;
@@ -536,6 +553,7 @@ public class GameTimelineManager : MonoBehaviour
 
         // Restart Stage 1
         StartStage1();
+        OnStateUpdated?.Invoke();
     }
 
     #endregion
@@ -603,10 +621,11 @@ public class GameTimelineManager : MonoBehaviour
         {
             string shelfStatus = isBookshelfAnchored ? "<color=green>[✓] Bookshelf Anchored</color>" : "<color=red>[ ] Bookshelf</color>";
             string paintStatus = isPaintingRemoved ? "<color=green>[✓] Painting Safe</color>" : "<color=red>[ ] Heavy Painting</color>";
+            string candleStatus = isCandleExtinguished ? "<color=green>[✓] Candle Out</color>" : "<color=red>[ ] Lit Candle</color>";
             string flashStatus = hasFlashlight ? "<color=green>[✓] Flashlight</color>" : "<color=red>[ ] Flashlight</color>";
             string medStatus = hasFirstAidKit ? "<color=green>[✓] First-Aid Kit</color>" : "<color=red>[ ] First-Aid Kit</color>";
 
-            inventoryHUDText.text = $"{shelfStatus}\n{paintStatus}\n{flashStatus}\n{medStatus}";
+            inventoryHUDText.text = $"{shelfStatus}\n{paintStatus}\n{candleStatus}\n{flashStatus}\n{medStatus}";
         }
     }
 
@@ -616,6 +635,7 @@ public class GameTimelineManager : MonoBehaviour
     public bool HasFirstAidKit => hasFirstAidKit;
     public bool IsBookshelfAnchored => isBookshelfAnchored;
     public bool IsPaintingRemoved => isPaintingRemoved;
+    public bool IsCandleExtinguished => isCandleExtinguished;
 
     #endregion
 }
