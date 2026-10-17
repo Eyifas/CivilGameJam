@@ -14,6 +14,10 @@ public class InventoryUI : MonoBehaviour
     {
         UpdateInventoryUI();
     }
+    private void Update()
+    {
+       UpdateInventoryUI();
+    }
 
     private void UpdateInventoryUI()
     {

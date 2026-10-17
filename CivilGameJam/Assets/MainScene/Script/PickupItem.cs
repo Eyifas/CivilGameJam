@@ -12,6 +12,15 @@ public class PickupItem : MonoBehaviour
         itemCollider = GetComponent<Collider2D>();
     }
 
+    private void Start()
+    {
+        // Bu eşya daha önce alındıysa tekrar görünmesin
+        if (InventoryManager.HasItem(itemName))
+        {
+            gameObject.SetActive(false);
+        }
+    }
+
     private void Update()
     {
         if (Mouse.current.leftButton.wasPressedThisFrame)
@@ -23,6 +32,7 @@ public class PickupItem : MonoBehaviour
             {
                 InventoryManager.AddItem(itemName);
 
+                // Eşyayı sahneden kaldır
                 gameObject.SetActive(false);
 
                 Debug.Log(itemName + " envantere eklendi!");

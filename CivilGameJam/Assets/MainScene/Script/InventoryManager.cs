@@ -1,8 +1,15 @@
 using System.Collections.Generic;
+using UnityEngine;
 
 public static class InventoryManager
 {
     private static List<string> items = new List<string>();
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+    private static void ResetInventory()
+    {
+        items.Clear();
+    }
 
     public static void AddItem(string itemName)
     {
