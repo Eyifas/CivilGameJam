@@ -600,7 +600,6 @@ GameObject:
   - component: {fileID: 1477116679}
   - component: {fileID: 1477116681}
   - component: {fileID: 1477116680}
-  - component: {fileID: 1477116682}
   m_Layer: 5
   m_Name: StoryImage
   m_TagString: Untagged
@@ -666,29 +665,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1477116678}
   m_CullTransparentMesh: 1
---- !u!114 &1477116682
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1477116678}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 26596c414e47543bc910c19f0e102562, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::StartMenuController
-  startButton: {fileID: 1871862202}
-  exitButton: {fileID: 1974414094}
-  storyImage: {fileID: 0}
-  storySprites:
-  - {fileID: -8922106209194868811, guid: 35316689320c448a483088a38b1a49ff, type: 3}
-  - {fileID: 8454299475192386434, guid: 08ff4b6a1ea974fe89a3dfc241f3162c, type: 3}
-  - {fileID: 5644454817382114052, guid: f0145b8f4313a4eeb8e7b59479f59180, type: 3}
-  - {fileID: 5088316998373936774, guid: 22488ca1564894428b359d112c9069bb, type: 3}
-  - {fileID: 8430968355662828279, guid: 36cd4c5fce1a048fdb2b105eeba31af0, type: 3}
-  - {fileID: 4739336465439239406, guid: 60d3beaee9471461784d7b794cd1cda0, type: 3}
-  gameSceneName: MainScene
 --- !u!1 &1870754943
 GameObject:
   m_ObjectHideFlags: 0
@@ -839,7 +815,7 @@ GameObject:
   - component: {fileID: 1871862205}
   - component: {fileID: 1871862204}
   m_Layer: 5
-  m_Name: START
+  m_Name: StartButton
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -908,7 +884,19 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 1871862205}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 1901952310}
+        m_TargetAssemblyTypeName: StartMenuController, Assembly-CSharp
+        m_MethodName: StartGame
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!114 &1871862205
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1069,12 +1057,12 @@ MonoBehaviour:
   exitButton: {fileID: 1974414094}
   storyImage: {fileID: 1477116680}
   storySprites:
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
-  - {fileID: 0}
+  - {fileID: -8922106209194868811, guid: 35316689320c448a483088a38b1a49ff, type: 3}
+  - {fileID: 8454299475192386434, guid: 08ff4b6a1ea974fe89a3dfc241f3162c, type: 3}
+  - {fileID: 5644454817382114052, guid: f0145b8f4313a4eeb8e7b59479f59180, type: 3}
+  - {fileID: -5040669905953186056, guid: 4be46030e54d34c6e9015d68fad1b27f, type: 3}
+  - {fileID: 8430968355662828279, guid: 36cd4c5fce1a048fdb2b105eeba31af0, type: 3}
+  - {fileID: 4739336465439239406, guid: 60d3beaee9471461784d7b794cd1cda0, type: 3}
   gameSceneName: MainScene
 --- !u!1 &1974414094
 GameObject:
@@ -1089,7 +1077,7 @@ GameObject:
   - component: {fileID: 1974414097}
   - component: {fileID: 1974414096}
   m_Layer: 5
-  m_Name: EXIT
+  m_Name: ExitButton
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1158,7 +1146,19 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 1974414097}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 1901952310}
+        m_TargetAssemblyTypeName: StartMenuController, Assembly-CSharp
+        m_MethodName: ExitGame
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!114 &1974414097
 MonoBehaviour:
   m_ObjectHideFlags: 0
