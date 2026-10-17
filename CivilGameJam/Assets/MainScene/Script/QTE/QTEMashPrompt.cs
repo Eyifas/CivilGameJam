@@ -33,6 +33,7 @@ public class QTEMashPrompt : MonoBehaviour
 
     // Internal state
     private bool isActive = false;
+    public bool IsActive => isActive;
     private float currentProgress = 0f;
     private float timeRemaining = 0f;
 

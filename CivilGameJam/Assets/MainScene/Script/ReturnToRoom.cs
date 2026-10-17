@@ -10,9 +10,15 @@ public class ReturnToRoom : MonoBehaviour
 
     private void Update()
     {
+        // Don't allow exiting room if player is currently in the middle of a QTE
+        if (QTEManager.Instance != null && QTEManager.Instance.IsAnyQTEActive)
+        {
+            return;
+        }
+
         if (!canExit)
         {
-            if (!Keyboard.current.eKey.isPressed)
+            if (Keyboard.current != null && !Keyboard.current.eKey.isPressed)
             {
                 canExit = true;
             }
@@ -20,7 +26,7 @@ public class ReturnToRoom : MonoBehaviour
             return;
         }
 
-        if (Keyboard.current.eKey.wasPressedThisFrame)
+        if (Keyboard.current != null && Keyboard.current.eKey.wasPressedThisFrame)
         {
             SceneManager.LoadScene(returnSceneName);
         }

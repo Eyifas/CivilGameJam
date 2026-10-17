@@ -26,6 +26,74 @@ public class InteractionZone : MonoBehaviour
         }
     }
 
+    private void Start()
+    {
+        CheckCompletionStatus();
+    }
+
+    private void OnEnable()
+    {
+        CheckCompletionStatus();
+    }
+
+    public void CheckCompletionStatus()
+    {
+        if (GameTimelineManager.Instance != null)
+        {
+            if (IsBookshelfZone() && GameTimelineManager.Instance.IsBookshelfAnchored)
+            {
+                DisableZonePermanently();
+            }
+        }
+    }
+
+    public bool IsBookshelfZone()
+    {
+        if (!string.IsNullOrEmpty(sceneName) && sceneName.IndexOf("Bookshelf", System.StringComparison.OrdinalIgnoreCase) >= 0)
+            return true;
+
+        if (transform.parent != null && transform.parent.name.IndexOf("Bookshelf", System.StringComparison.OrdinalIgnoreCase) >= 0)
+            return true;
+
+        if (name.IndexOf("Bookshelf", System.StringComparison.OrdinalIgnoreCase) >= 0)
+            return true;
+
+        return false;
+    }
+
+    public void DisableZonePermanently()
+    {
+        isInteractable = false;
+        playerInside = false;
+
+        var col = GetComponent<Collider2D>();
+        if (col != null)
+        {
+            col.enabled = false;
+        }
+
+        if (interactionPrompt == null) FindPrompt();
+        if (interactionPrompt != null)
+        {
+            interactionPrompt.SetActive(false);
+        }
+
+        if (transform.parent != null)
+        {
+            var siblingPrompt = transform.parent.Find("InteractionPrompt");
+            if (siblingPrompt == null) siblingPrompt = transform.parent.Find("E Button");
+            if (siblingPrompt != null)
+            {
+                siblingPrompt.gameObject.SetActive(false);
+            }
+        }
+
+        if (InteractionManager.Instance != null)
+        {
+            InteractionManager.Instance.ExitZone(this);
+        }
+    }
+
     private void FindPrompt()
     {
         if (interactionPrompt != null) return;
@@ -57,10 +125,19 @@ public class InteractionZone : MonoBehaviour
         if (!isInteractable) return;
 
         // Stage guard: Only interactable during Stage 1
-        if (GameTimelineManager.Instance != null && GameTimelineManager.Instance.CurrentStage != GameStage.Stage1_Preparation)
+        if (GameTimelineManager.Instance != null)
         {
-            SetInteractable(false);
-            return;
+            if (GameTimelineManager.Instance.CurrentStage != GameStage.Stage1_Preparation)
+            {
+                SetInteractable(false);
+                return;
+            }
+
+            if (IsBookshelfZone() && GameTimelineManager.Instance.IsBookshelfAnchored)
+            {
+                DisableZonePermanently();
+                return;
+            }
         }
 
         if (playerInside && Keyboard.current != null && Keyboard.current.eKey.wasPressedThisFrame)
@@ -72,6 +149,12 @@ public class InteractionZone : MonoBehaviour
     public void OnInteractTriggered()
     {
         if (!isInteractable || !playerInside) return;
+
+        if (IsBookshelfZone() && GameTimelineManager.Instance != null && GameTimelineManager.Instance.IsBookshelfAnchored)
+        {
+            DisableZonePermanently();
+            return;
+        }
 
         if (!string.IsNullOrEmpty(sceneName))
         {
@@ -89,8 +172,17 @@ public class InteractionZone : MonoBehaviour
     {
         if (!isInteractable) return;
 
-        if (GameTimelineManager.Instance != null && GameTimelineManager.Instance.CurrentStage != GameStage.Stage1_Preparation)
-            return;
+        if (GameTimelineManager.Instance != null)
+        {
+            if (GameTimelineManager.Instance.CurrentStage != GameStage.Stage1_Preparation)
+                return;
+
+            if (IsBookshelfZone() && GameTimelineManager.Instance.IsBookshelfAnchored)
+            {
+                DisableZonePermanently();
+                return;
+            }
+        }
 
         if (other.CompareTag("Player"))
         {
@@ -133,6 +225,12 @@ public class InteractionZone : MonoBehaviour
     public void SetInteractable(bool active)
     {
         isInteractable = active;
+        var col = GetComponent<Collider2D>();
+        if (col != null)
+        {
+            col.enabled = active;
+        }
+
         if (!active)
         {
             playerInside = false;

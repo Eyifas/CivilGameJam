@@ -43,6 +43,7 @@ public class QTETimingBar : MonoBehaviour
 
     // Internal state
     private bool isActive = false;
+    public bool IsActive => isActive;
     private int currentHits = 0;
     private int currentMisses = 0;
     private float pointerNormalized = 0f;

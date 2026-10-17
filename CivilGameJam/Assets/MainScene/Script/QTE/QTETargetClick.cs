@@ -35,11 +35,11 @@ public class QTETargetClick : MonoBehaviour
     [Header("Key Pool Configuration")]
     [SerializeField] private Key[] allowedKeys = new Key[]
     {
-        Key.E,
+        Key.Space,
         Key.F,
         Key.Q,
         Key.R,
-        Key.Space
+        Key.C
     };
 
     // Events
@@ -48,6 +48,7 @@ public class QTETargetClick : MonoBehaviour
 
     // Internal state
     private bool isActive = false;
+    public bool IsActive => isActive;
     private int currentHits = 0;
     private int currentMisses = 0;
     private float targetTimer = 0f;
@@ -55,6 +56,11 @@ public class QTETargetClick : MonoBehaviour
 
     private void Awake()
     {
+        if (rootPanel == null)
+        {
+            rootPanel = gameObject;
+        }
+
         // Prevent background elements from blocking clicks
         if (rootPanel != null)
         {
@@ -140,22 +146,38 @@ public class QTETargetClick : MonoBehaviour
 
     private void PositionTargetRandomly()
     {
-        if (spawnArea == null || targetRect == null) return;
+        if (targetRect == null) return;
 
         targetRect.SetAsLastSibling();
 
-        float areaWidth = spawnArea.rect.width;
-        float areaHeight = spawnArea.rect.height;
-        float targetWidth = targetRect.rect.width;
-        float targetHeight = targetRect.rect.height;
+        float areaWidth = 800f;
+        float areaHeight = 500f;
 
-        float minX = -areaWidth * 0.5f + targetWidth * 0.5f;
-        float maxX = areaWidth * 0.5f - targetWidth * 0.5f;
-        float minY = -areaHeight * 0.5f + targetHeight * 0.5f;
-        float maxY = areaHeight * 0.5f - targetHeight * 0.5f;
+        if (spawnArea != null && spawnArea.rect.width > 250f && spawnArea.rect.height > 250f)
+        {
+            areaWidth = spawnArea.rect.width;
+            areaHeight = spawnArea.rect.height;
+        }
+        else
+        {
+            // Fallback: If spawnArea is missing or too small (e.g. default 100x100), use parent Canvas size
+            Canvas parentCanvas = GetComponentInParent<Canvas>();
+            if (parentCanvas != null && parentCanvas.GetComponent<RectTransform>() != null)
+            {
+                Rect canvasRect = parentCanvas.GetComponent<RectTransform>().rect;
+                areaWidth = canvasRect.width * 0.7f;
+                areaHeight = canvasRect.height * 0.7f;
+            }
+        }
 
-        float randomX = UnityEngine.Random.Range(minX, maxX);
-        float randomY = UnityEngine.Random.Range(minY, maxY);
+        float targetWidth = targetRect.rect.width > 0f ? targetRect.rect.width : 160f;
+        float targetHeight = targetRect.rect.height > 0f ? targetRect.rect.height : 40f;
+
+        float halfW = Mathf.Max(0f, (areaWidth - targetWidth) * 0.5f);
+        float halfH = Mathf.Max(0f, (areaHeight - targetHeight) * 0.5f);
+
+        float randomX = UnityEngine.Random.Range(-halfW, halfW);
+        float randomY = UnityEngine.Random.Range(-halfH, halfH);
 
         targetRect.anchoredPosition = new Vector2(randomX, randomY);
     }
@@ -176,7 +198,25 @@ public class QTETargetClick : MonoBehaviour
             return;
         }
 
-        // Check if the current random key was pressed
+        // 1. Direct mouse click on target button (works even without EventSystem / GraphicRaycaster)
+        if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame)
+        {
+            Vector2 mousePos = Mouse.current.position.ReadValue();
+            Camera eventCam = null;
+            Canvas canvas = GetComponentInParent<Canvas>();
+            if (canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay)
+            {
+                eventCam = canvas.worldCamera;
+            }
+
+            if (targetRect != null && RectTransformUtility.RectangleContainsScreenPoint(targetRect, mousePos, eventCam))
+            {
+                OnTargetClicked();
+                return;
+            }
+        }
+
+        // 2. Check if the current random key was pressed
         if (Keyboard.current != null && Keyboard.current[currentPromptKey].wasPressedThisFrame)
         {
             OnTargetClicked();

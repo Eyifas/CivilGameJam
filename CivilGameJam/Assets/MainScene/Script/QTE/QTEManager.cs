@@ -1,9 +1,11 @@
 using System;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 /// <summary>
 /// Central manager for Quick Time Events. Provides easy static/singleton access
-/// to trigger either a Timing Bar QTE or a Mash Prompt QTE from any trigger or game manager.
+/// to trigger either a Timing Bar QTE, a Mash Prompt QTE, or a Target Click QTE.
+/// Persists across scenes with DontDestroyOnLoad.
 /// </summary>
 public class QTEManager : MonoBehaviour
 {
@@ -13,6 +15,10 @@ public class QTEManager : MonoBehaviour
     [SerializeField] private QTEMashPrompt mashPrompt;
     [SerializeField] private QTETargetClick targetClick;
 
+    public bool IsAnyQTEActive => (targetClick != null && targetClick.IsActive) ||
+                                  (timingBar != null && timingBar.IsActive) ||
+                                  (mashPrompt != null && mashPrompt.IsActive);
+
     private void Awake()
     {
         if (Instance != null && Instance != this)
@@ -20,7 +26,44 @@ public class QTEManager : MonoBehaviour
             Destroy(gameObject);
             return;
         }
+
         Instance = this;
+        DontDestroyOnLoad(gameObject);
+
+        FindQTEReferences();
+    }
+
+    private void OnEnable()
+    {
+        SceneManager.sceneLoaded += HandleSceneLoaded;
+    }
+
+    private void OnDisable()
+    {
+        SceneManager.sceneLoaded -= HandleSceneLoaded;
+    }
+
+    private void HandleSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        FindQTEReferences();
+    }
+
+    public void FindQTEReferences()
+    {
+        if (targetClick == null)
+        {
+            targetClick = FindFirstObjectByType<QTETargetClick>(FindObjectsInactive.Include);
+        }
+
+        if (mashPrompt == null)
+        {
+            mashPrompt = FindFirstObjectByType<QTEMashPrompt>(FindObjectsInactive.Include);
+        }
+
+        if (timingBar == null)
+        {
+            timingBar = FindFirstObjectByType<QTETimingBar>(FindObjectsInactive.Include);
+        }
     }
 
     /// <summary>
@@ -30,9 +73,15 @@ public class QTEManager : MonoBehaviour
     {
         if (targetClick == null)
         {
-            Debug.LogError("QTEManager: QTETargetClick reference is missing!");
+            FindQTEReferences();
+        }
+
+        if (targetClick == null)
+        {
+            Debug.LogError("[QTEManager] QTETargetClick reference is missing in the scene!");
             return;
         }
+
         targetClick.StartQTE(targetCount, timeLimitPerTarget, onComplete, onFail);
     }
 
@@ -43,9 +92,15 @@ public class QTEManager : MonoBehaviour
     {
         if (timingBar == null)
         {
-            Debug.LogError("QTEManager: QTETimingBar reference is missing!");
+            FindQTEReferences();
+        }
+
+        if (timingBar == null)
+        {
+            Debug.LogError("[QTEManager] QTETimingBar reference is missing!");
             return;
         }
+
         timingBar.StartQTE(hitsNeeded, onComplete, onFail);
     }
 
@@ -56,9 +111,15 @@ public class QTEManager : MonoBehaviour
     {
         if (mashPrompt == null)
         {
-            Debug.LogError("QTEManager: QTEMashPrompt reference is missing!");
+            FindQTEReferences();
+        }
+
+        if (mashPrompt == null)
+        {
+            Debug.LogError("[QTEManager] QTEMashPrompt reference is missing!");
             return;
         }
+
         mashPrompt.StartQTE(promptText, duration, clickPower, decayRate, onComplete, onFail);
     }
 
@@ -69,4 +130,3 @@ public class QTEManager : MonoBehaviour
         if (mashPrompt != null) mashPrompt.CancelQTE();
     }
 }
-
