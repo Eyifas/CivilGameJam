@@ -1,5 +1,4 @@
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 public class DrawerController : MonoBehaviour
 {
@@ -7,6 +6,8 @@ public class DrawerController : MonoBehaviour
     [SerializeField] private Sprite leftOpenSprite;
     [SerializeField] private Sprite rightOpenSprite;
     [SerializeField] private Sprite bothOpenSprite;
+
+    [SerializeField] private GameObject hammerObject;
 
     private SpriteRenderer spriteRenderer;
 
@@ -16,6 +17,13 @@ public class DrawerController : MonoBehaviour
     private void Awake()
     {
         spriteRenderer = GetComponent<SpriteRenderer>();
+
+        // Oyun başladığında çekici gizle
+        if (hammerObject != null)
+        {
+            hammerObject.SetActive(false);
+        }
+
         UpdateDrawerVisual();
     }
 
@@ -28,7 +36,9 @@ public class DrawerController : MonoBehaviour
     public void ToggleRightDrawer()
     {
         rightOpen = !rightOpen;
+
         UpdateDrawerVisual();
+        UpdateHammer();
     }
 
     private void UpdateDrawerVisual()
@@ -49,5 +59,23 @@ public class DrawerController : MonoBehaviour
         {
             spriteRenderer.sprite = closedSprite;
         }
+    }
+
+    private void UpdateHammer()
+    {
+        if (hammerObject == null)
+        {
+            return;
+        }
+
+        // Çekiç daha önce alınmışsa bir daha gösterme
+        if (InventoryManager.HasItem("Hammer"))
+        {
+            hammerObject.SetActive(false);
+            return;
+        }
+
+        // Sağ çekmece açıksa göster, kapalıysa gizle
+        hammerObject.SetActive(rightOpen);
     }
 }
