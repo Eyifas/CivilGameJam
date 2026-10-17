@@ -1080,6 +1080,27 @@ public class GameTimelineManager : MonoBehaviour
         }
     }
 
+    public void SetHUDVisibility(bool visible)
+    {
+        if (timerText != null && timerText.gameObject != null)
+        {
+            timerText.gameObject.SetActive(visible);
+        }
+        if (stageObjectiveText != null && stageObjectiveText.gameObject != null)
+        {
+            stageObjectiveText.gameObject.SetActive(visible);
+        }
+        if (inventoryHUDText != null && inventoryHUDText.gameObject != null)
+        {
+            inventoryHUDText.gameObject.SetActive(visible);
+        }
+        if (PersistentCanvas.Instance != null)
+        {
+            var c = PersistentCanvas.Instance.GetComponent<Canvas>();
+            if (c != null) c.enabled = visible;
+        }
+    }
+
     // Public Getters
     public GameStage CurrentStage => currentStage;
     public bool HasFlashlight => hasFlashlight;
