@@ -1088,6 +1088,22 @@ public class GameTimelineManager : MonoBehaviour
     public bool IsPaintingRemoved => isPaintingRemoved;
     public bool IsCandleExtinguished => isCandleExtinguished;
     public bool IsCabinetSecured => isCabinetSecured;
+    public bool IsGasShutOff => isGasShutOff;
+    public bool IsBreakerShutOff => isBreakerShutOff;
+
+    public void HandleGasValveShutOff()
+    {
+        if (isGasShutOff) return;
+        RecordActionSnapshot("Gas Valve Closed (Semicircle Turn)");
+        isGasShutOff = true;
+        Debug.Log("<color=green>[Timeline] Gas valve safely turned shut via QTE!</color>");
+        OnStateUpdated?.Invoke();
+
+        if (currentStage == GameStage.Stage3_Utilities && isBreakerShutOff)
+        {
+            AdvanceToStage4();
+        }
+    }
 
     #endregion
 }

@@ -167,6 +167,9 @@ public class InteractionZone : MonoBehaviour
         if (IsTableZone() && GameTimelineManager.Instance.IsCandleExtinguished && GameTimelineManager.Instance.IsPaintingRemoved)
             return true;
 
+        if (IsPipeZone() && GameTimelineManager.Instance.IsGasShutOff)
+            return true;
+
         return false;
     }
 
@@ -196,6 +199,25 @@ public class InteractionZone : MonoBehaviour
             return true;
 
         if (name.IndexOf("Bookshelf", System.StringComparison.OrdinalIgnoreCase) >= 0)
+            return true;
+
+        return false;
+    }
+
+    public bool IsPipeZone()
+    {
+        if (!string.IsNullOrEmpty(sceneName) && sceneName.IndexOf("Pipe", System.StringComparison.OrdinalIgnoreCase) >= 0)
+            return true;
+
+        if (transform.parent != null && 
+            (transform.parent.name.IndexOf("Pipe", System.StringComparison.OrdinalIgnoreCase) >= 0 ||
+             transform.parent.name.IndexOf("boru", System.StringComparison.OrdinalIgnoreCase) >= 0 ||
+             transform.parent.name.IndexOf("vana", System.StringComparison.OrdinalIgnoreCase) >= 0))
+            return true;
+
+        if (name.IndexOf("Pipe", System.StringComparison.OrdinalIgnoreCase) >= 0 ||
+            name.IndexOf("boru", System.StringComparison.OrdinalIgnoreCase) >= 0 ||
+            name.IndexOf("vana", System.StringComparison.OrdinalIgnoreCase) >= 0)
             return true;
 
         return false;
@@ -300,10 +322,15 @@ public class InteractionZone : MonoBehaviour
             if (sceneName.IndexOf("Drawer", System.StringComparison.OrdinalIgnoreCase) >= 0) return "Search Drawer";
             if (sceneName.IndexOf("Bookshelf", System.StringComparison.OrdinalIgnoreCase) >= 0) return "Anchor Bookshelf";
             if (sceneName.IndexOf("Table", System.StringComparison.OrdinalIgnoreCase) >= 0) return "Secure Desk";
+            if (sceneName.IndexOf("Pipe", System.StringComparison.OrdinalIgnoreCase) >= 0) return "Shut Off Gas";
             return sceneName;
         }
         if (transform.parent != null)
         {
+            if (transform.parent.name.IndexOf("boru", System.StringComparison.OrdinalIgnoreCase) >= 0 ||
+                transform.parent.name.IndexOf("vana", System.StringComparison.OrdinalIgnoreCase) >= 0 ||
+                transform.parent.name.IndexOf("pipe", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                return "Shut Off Gas";
             return transform.parent.name;
         }
         return "Interact";
@@ -313,11 +340,16 @@ public class InteractionZone : MonoBehaviour
     {
         if (!isInteractable) return;
 
-        // Stage guard: Only interactable during Stage 1
-        if (GameTimelineManager.Instance != null && GameTimelineManager.Instance.CurrentStage != GameStage.Stage1_Preparation)
+        // Stage guard: Only interactable during Stage 1 (and Stage 3 for pipe/utilities)
+        if (GameTimelineManager.Instance != null)
         {
-            SetInteractable(false);
-            return;
+            var stage = GameTimelineManager.Instance.CurrentStage;
+            bool allowed = (stage == GameStage.Stage1_Preparation) || (IsPipeZone() && stage == GameStage.Stage3_Utilities);
+            if (!allowed)
+            {
+                SetInteractable(false);
+                return;
+            }
         }
 
         if (IsZoneCompleted())

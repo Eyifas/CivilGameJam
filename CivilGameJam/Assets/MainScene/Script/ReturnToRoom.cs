@@ -15,6 +15,8 @@ public class ReturnToRoom : MonoBehaviour
     [Tooltip("Target scene to return to when exiting")]
     [SerializeField] private string returnSceneName = "MainScene";
 
+    public string ReturnSceneName => returnSceneName;
+
     [Header("Button Visual Setup")]
     [Tooltip("Text displayed next to the button icon (set in Inspector)")]
     [SerializeField] private string labelText = "Go Back";
@@ -123,6 +125,7 @@ public class ReturnToRoom : MonoBehaviour
         if (isReturning) return;
         if (CupboardSceneController.Instance != null && CupboardSceneController.Instance.IsBusy) return;
         if (TableSceneController.Instance != null && TableSceneController.Instance.IsBusy) return;
+        if (PipeSceneController.Instance != null && PipeSceneController.Instance.IsBusy) return;
 
         // Prevent immediate exit if player was holding [E] upon entering the scene
         if (!canExit)
@@ -169,6 +172,7 @@ public class ReturnToRoom : MonoBehaviour
         if (!showOnScreenButton || customCanvasButton != null) return;
         if (CupboardSceneController.Instance != null && CupboardSceneController.Instance.IsBusy) return;
         if (TableSceneController.Instance != null && TableSceneController.Instance.IsBusy) return;
+        if (PipeSceneController.Instance != null && PipeSceneController.Instance.IsBusy) return;
 
         EnsureStyles();
 

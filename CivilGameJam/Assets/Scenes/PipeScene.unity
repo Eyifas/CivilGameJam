@@ -135,7 +135,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &286092739
 Transform:
   m_ObjectHideFlags: 0
@@ -297,8 +297,8 @@ Transform:
   m_GameObject: {fileID: 494405968}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.37, y: -0.37, z: 0}
-  m_LocalScale: {x: 2.51, y: 2.51, z: 2.51}
+  m_LocalPosition: {x: 1, y: -1.1, z: 0}
+  m_LocalScale: {x: 2.3, y: 2.3, z: 2.3}
   m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 0}
@@ -679,6 +679,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1266927825}
   - component: {fileID: 1266927824}
+  - component: {fileID: 1266927826}
   m_Layer: 0
   m_Name: SceneManager
   m_TagString: Untagged
@@ -709,6 +710,27 @@ MonoBehaviour:
   showBackground: 1
   showOnScreenButton: 1
   customCanvasButton: {fileID: 0}
+--- !u!114 &1266927826
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1266927823}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3f24ece2625c416eb542720cb5857765, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PipeSceneController
+  pipeBodyTransform: {fileID: 494405970}
+  valveHandleTransform: {fileID: 1649078138}
+  sceneCamera: {fileID: 519420031}
+  turnSpeedKeyboard: 75
+  maxTurnSpeedMouse: 360
+  autoReturnDelay: 1.8
+  customGasHiss: {fileID: 0}
+  customMetalCreak: {fileID: 0}
+  customValveLatch: {fileID: 0}
 --- !u!4 &1266927825
 Transform:
   m_ObjectHideFlags: 0
@@ -788,7 +810,7 @@ SpriteRenderer:
   m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 8
+  m_SortingOrder: 9
   m_MaskInteraction: 0
   m_Sprite: {fileID: 21300000, guid: 5c9d55838a97846358c9477daad27cb1, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
@@ -810,8 +832,8 @@ Transform:
   m_GameObject: {fileID: 1649078136}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.88, y: -0.22, z: 0}
-  m_LocalScale: {x: 2.03, y: 2.03, z: 2.03}
+  m_LocalPosition: {x: 1, y: -1.1, z: 0}
+  m_LocalScale: {x: 2.3, y: 2.3, z: 2.3}
   m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 0}
