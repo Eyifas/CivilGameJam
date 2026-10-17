@@ -336,21 +336,31 @@ public class InteractionZone : MonoBehaviour
         return "Interact";
     }
 
+    public bool IsAllowedInCurrentStage()
+    {
+        if (GameTimelineManager.Instance == null) return true;
+
+        var stage = GameTimelineManager.Instance.CurrentStage;
+
+        if (IsPipeZone())
+        {
+            // Kitchen gas pipe is ONLY interactable after the earthquake during Stage 3 Utilities (until gas is shut off)
+            return stage == GameStage.Stage3_Utilities && !GameTimelineManager.Instance.IsGasShutOff;
+        }
+
+        // Room preparation zones (Drawer, Bookshelf, Table/Painting) are only interactable during Stage 1 Preparation
+        return stage == GameStage.Stage1_Preparation && !IsZoneCompleted();
+    }
+
     private void Update()
     {
-        if (!isInteractable) return;
-
-        // Stage guard: Only interactable during Stage 1 (and Stage 3 for pipe/utilities)
-        if (GameTimelineManager.Instance != null)
+        bool allowed = IsAllowedInCurrentStage();
+        if (isInteractable != allowed)
         {
-            var stage = GameTimelineManager.Instance.CurrentStage;
-            bool allowed = (stage == GameStage.Stage1_Preparation) || (IsPipeZone() && stage == GameStage.Stage3_Utilities);
-            if (!allowed)
-            {
-                SetInteractable(false);
-                return;
-            }
+            SetInteractable(allowed);
         }
+
+        if (!isInteractable) return;
 
         if (IsZoneCompleted())
         {
@@ -388,10 +398,7 @@ public class InteractionZone : MonoBehaviour
 
     private void OnTriggerEnter2D(Collider2D other)
     {
-        if (!isInteractable) return;
-
-        if (GameTimelineManager.Instance != null && GameTimelineManager.Instance.CurrentStage != GameStage.Stage1_Preparation)
-            return;
+        if (!isInteractable || !IsAllowedInCurrentStage()) return;
 
         if (IsZoneCompleted())
         {
@@ -450,6 +457,20 @@ public class InteractionZone : MonoBehaviour
         if (active)
         {
             CheckCompletionStatus();
+
+            // If player is already touching zone when it becomes active, show prompt
+            if (col != null)
+            {
+                var player = GameObject.FindWithTag("Player");
+                if (player != null && player.TryGetComponent<Collider2D>(out var pCol) && col.IsTouching(pCol))
+                {
+                    playerInside = true;
+                    if (interactionPrompt == null) FindPrompt();
+                    SetupPromptLabel();
+                    if (interactionPrompt != null) interactionPrompt.SetActive(true);
+                    if (InteractionManager.Instance != null) InteractionManager.Instance.EnterZone(this);
+                }
+            }
         }
         else
         {

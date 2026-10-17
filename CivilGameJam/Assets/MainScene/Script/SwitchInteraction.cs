@@ -388,6 +388,16 @@ public class SwitchInteraction : MonoBehaviour
     {
         if (!triggerOnInteract) return;
 
+        // The kitchen light switch is only interactable in Stage 3 (after the earthquake)
+        if (GameTimelineManager.Instance != null && GameTimelineManager.Instance.CurrentStage != GameStage.Stage3_Utilities)
+        {
+            if (interactionPrompt != null && interactionPrompt.activeSelf)
+            {
+                interactionPrompt.SetActive(false);
+            }
+            return;
+        }
+
         if (playerInside &&
             !triggered &&
             Keyboard.current != null &&
@@ -580,6 +590,13 @@ public class SwitchInteraction : MonoBehaviour
         if (other.CompareTag("Player") && triggerOnInteract && !triggered)
         {
             playerInside = true;
+
+            // Only show prompt in Stage 3 (after the earthquake)
+            if (GameTimelineManager.Instance != null && GameTimelineManager.Instance.CurrentStage != GameStage.Stage3_Utilities)
+            {
+                return;
+            }
+
             if (interactionPrompt != null)
             {
                 interactionPrompt.SetActive(true);

@@ -31,6 +31,7 @@ public class CupboardTriggerZone : MonoBehaviour
         if (GameTimelineManager.Instance != null)
         {
             GameTimelineManager.Instance.OnStateUpdated += CheckStatus;
+            GameTimelineManager.Instance.OnStageChanged += HandleStageChanged;
         }
         CheckStatus();
     }
@@ -40,12 +41,22 @@ public class CupboardTriggerZone : MonoBehaviour
         if (GameTimelineManager.Instance != null)
         {
             GameTimelineManager.Instance.OnStateUpdated -= CheckStatus;
+            GameTimelineManager.Instance.OnStageChanged -= HandleStageChanged;
         }
+    }
+
+    private void HandleStageChanged(GameStage stage)
+    {
+        CheckStatus();
     }
 
     public void CheckStatus()
     {
-        if (GameTimelineManager.Instance != null && GameTimelineManager.Instance.IsCabinetSecured)
+        // Kitchen cupboard is only interactable after the earthquake (Stage 3 Utilities)!
+        bool allowedStage = GameTimelineManager.Instance != null && GameTimelineManager.Instance.CurrentStage == GameStage.Stage3_Utilities;
+        bool secured = GameTimelineManager.Instance != null && GameTimelineManager.Instance.IsCabinetSecured;
+
+        if (!allowedStage || secured)
         {
             isTriggered = true;
             if (TryGetComponent<Collider2D>(out var col))
@@ -68,13 +79,19 @@ public class CupboardTriggerZone : MonoBehaviour
         if (isTriggered) return;
         if (!other.CompareTag("Player")) return;
 
+        // The kitchen should only be interactable after the earthquake (Stage 3 Utilities)!
+        if (GameTimelineManager.Instance != null && GameTimelineManager.Instance.CurrentStage != GameStage.Stage3_Utilities)
+        {
+            return;
+        }
+
         if (GameTimelineManager.Instance != null && GameTimelineManager.Instance.IsCabinetSecured)
         {
             return;
         }
 
         isTriggered = true;
-        Debug.Log("[CupboardTriggerZone] Player touched dolap mutfak1/InteractionZone! Loading CupboardScene...");
+        Debug.Log("[CupboardTriggerZone] Player touched dolap mutfak1/InteractionZone in Stage 3! Loading CupboardScene...");
 
         // Save position so player returns right outside the cabinet
         PlayerMovement.LastSavedPosition = other.transform.position;

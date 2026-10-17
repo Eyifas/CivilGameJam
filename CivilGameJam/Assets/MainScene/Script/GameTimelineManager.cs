@@ -143,6 +143,17 @@ public class GameTimelineManager : MonoBehaviour
     private void HandleSceneLoaded(Scene scene, LoadSceneMode mode)
     {
         RebindSceneReferences();
+        if (scene.name == "MainScene")
+        {
+            if (currentStage == GameStage.Stage3_Utilities)
+            {
+                EnableStage3Interactions();
+            }
+            else if (currentStage == GameStage.Stage1_Preparation)
+            {
+                ReEnableStage1Interactions();
+            }
+        }
     }
 
     private void RebindSceneReferences()
@@ -559,6 +570,7 @@ public class GameTimelineManager : MonoBehaviour
         SetObjectiveText("STAGE 3: Gas leak detected! Secure cabinet & shut off utilities safely.");
         Debug.Log($"[Timeline] Stage 3 Started: Post-Shaking Utilities & Hazards. Timer: {currentStageTimer:F1}s (including +{carriedOverBonus:F1}s bonus).");
         UpdateTimerHUD();
+        EnableStage3Interactions();
         OnStageChanged?.Invoke(currentStage);
     }
 
@@ -980,6 +992,8 @@ public class GameTimelineManager : MonoBehaviour
                 playerMovement.enabled = true;
                 playerMovement.transform.position = snapshot.playerPosition;
             }
+
+            EnableStage3Interactions();
         }
         else if (failedStage == GameStage.Stage4_Stairwell)
         {
@@ -1015,7 +1029,18 @@ public class GameTimelineManager : MonoBehaviour
     private void ReEnableStage1Interactions()
     {
         var zones = FindObjectsByType<InteractionZone>(FindObjectsInactive.Include, FindObjectsSortMode.None);
-        foreach (var z in zones) z.SetInteractable(true);
+        foreach (var z in zones)
+        {
+            // Kitchen pipe zone must NOT be interactable in Stage 1!
+            if (z.IsPipeZone())
+            {
+                z.SetInteractable(false);
+            }
+            else
+            {
+                z.SetInteractable(true);
+            }
+        }
 
         var roomItems = FindObjectsByType<RoomItemInteractable>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         foreach (var r in roomItems) r.SetInteractable(true);
@@ -1026,6 +1051,36 @@ public class GameTimelineManager : MonoBehaviour
         var cupboardTriggers = FindObjectsByType<CupboardTriggerZone>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         foreach (var ctz in cupboardTriggers) ctz.CheckStatus();
 
+        if (InteractionManager.Instance != null)
+        {
+            InteractionManager.Instance.ResetPromptsSystem();
+        }
+    }
+
+    public void EnableStage3Interactions()
+    {
+        // 1. Enable Pipe InteractionZone in kitchen (if gas is not already shut off)
+        var zones = FindObjectsByType<InteractionZone>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        foreach (var z in zones)
+        {
+            if (z.IsPipeZone())
+            {
+                z.SetInteractable(!isGasShutOff);
+            }
+            else
+            {
+                z.SetInteractable(false);
+            }
+        }
+
+        // 2. Enable Cupboard trigger zone in kitchen
+        var cupboardTriggers = FindObjectsByType<CupboardTriggerZone>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        foreach (var ctz in cupboardTriggers)
+        {
+            ctz.CheckStatus();
+        }
+
+        // 3. Ensure prompts system refreshed
         if (InteractionManager.Instance != null)
         {
             InteractionManager.Instance.ResetPromptsSystem();
@@ -1200,6 +1255,14 @@ public class GameTimelineManager : MonoBehaviour
         RecordActionSnapshot("Gas Valve Closed (Semicircle Turn)");
         isGasShutOff = true;
         Debug.Log("<color=green>[Timeline] Gas valve safely turned shut via QTE!</color>");
+
+        // Disable pipe zone once gas is shut off
+        var zones = FindObjectsByType<InteractionZone>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        foreach (var z in zones)
+        {
+            if (z.IsPipeZone()) z.SetInteractable(false);
+        }
+
         OnStateUpdated?.Invoke();
 
         if (currentStage == GameStage.Stage3_Utilities && isBreakerShutOff)
