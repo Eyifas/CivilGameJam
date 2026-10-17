@@ -24,7 +24,7 @@ public class InteractionZone : MonoBehaviour
 
             if (InteractionManager.Instance != null)
             {
-                InteractionManager.Instance.EnterZone();
+                InteractionManager.Instance.EnterZone(this);
             }
         }
     }
@@ -37,7 +37,7 @@ public class InteractionZone : MonoBehaviour
 
             if (InteractionManager.Instance != null)
             {
-                InteractionManager.Instance.ExitZone();
+                InteractionManager.Instance.ExitZone(this);
             }
         }
     }
