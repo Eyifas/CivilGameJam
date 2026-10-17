@@ -528,6 +528,12 @@ public class GameTimelineManager : MonoBehaviour
             InteractionManager.Instance.ResetPromptsSystem();
         }
 
+        PlayerMovement.ClearSavedPosition();
+        if (playerMovement != null)
+        {
+            playerMovement.transform.position = new Vector3(-9.6f, -2.2f, 0f);
+        }
+
         // Restart Stage 1
         StartStage1();
     }

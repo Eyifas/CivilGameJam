@@ -75,6 +75,12 @@ public class InteractionZone : MonoBehaviour
 
         if (!string.IsNullOrEmpty(sceneName))
         {
+            var player = GameObject.FindWithTag("Player");
+            if (player != null)
+            {
+                PlayerMovement.SavePosition(player.transform.position);
+            }
+
             SceneManager.LoadScene(sceneName);
         }
     }

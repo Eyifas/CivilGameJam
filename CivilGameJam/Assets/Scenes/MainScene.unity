@@ -804,6 +804,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::InteractionZone
   sceneName: 
+  interactionPrompt: {fileID: 0}
 --- !u!61 &405818178
 BoxCollider2D:
   m_ObjectHideFlags: 0
@@ -838,7 +839,7 @@ BoxCollider2D:
   m_UsedByEffector: 0
   m_CompositeOperation: 0
   m_CompositeOrder: 0
-  m_Offset: {x: -0.036242962, y: -0.18121463}
+  m_Offset: {x: -0.022899538, y: -0.18121463}
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0, y: 0}
@@ -848,7 +849,7 @@ BoxCollider2D:
     drawMode: 0
     adaptiveTiling: 0
   m_AutoTiling: 0
-  m_Size: {x: 2.2322593, y: 1.4784065}
+  m_Size: {x: 1.5354302, y: 1.4784065}
   m_EdgeRadius: 0
 --- !u!1 &420237344
 GameObject:
@@ -2063,6 +2064,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::InteractionZone
   sceneName: BookshelfScene
+  interactionPrompt: {fileID: 0}
 --- !u!61 &963495891
 BoxCollider2D:
   m_ObjectHideFlags: 0
@@ -2097,7 +2099,7 @@ BoxCollider2D:
   m_UsedByEffector: 0
   m_CompositeOperation: 0
   m_CompositeOrder: 0
-  m_Offset: {x: 0.061553955, y: -0.029519081}
+  m_Offset: {x: 0.21180356, y: -0.029519081}
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0, y: 0}
@@ -2107,7 +2109,7 @@ BoxCollider2D:
     drawMode: 0
     adaptiveTiling: 0
   m_AutoTiling: 0
-  m_Size: {x: 3.363617, y: 5.5400543}
+  m_Size: {x: 2.2982113, y: 5.5400543}
   m_EdgeRadius: 0
 --- !u!1 &1075862537
 GameObject:
@@ -3180,7 +3182,7 @@ BoxCollider2D:
   m_UsedByEffector: 0
   m_CompositeOperation: 0
   m_CompositeOrder: 0
-  m_Offset: {x: 0.0037851334, y: -0.10598898}
+  m_Offset: {x: -0.046298712, y: -0.10598898}
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0, y: 0}
@@ -3190,7 +3192,7 @@ BoxCollider2D:
     drawMode: 0
     adaptiveTiling: 0
   m_AutoTiling: 0
-  m_Size: {x: 3.3544712, y: 2.3475752}
+  m_Size: {x: 2.070521, y: 2.3475752}
   m_EdgeRadius: 0
 --- !u!114 &1398593821
 MonoBehaviour:
@@ -3205,6 +3207,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::InteractionZone
   sceneName: DrawerScene
+  interactionPrompt: {fileID: 0}
 --- !u!1 &1425509222
 GameObject:
   m_ObjectHideFlags: 0
