@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.IO;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -7,13 +8,19 @@ using UnityEngine.InputSystem;
 
 /// <summary>
 /// Controls the cinematic "Going Back in Time" death/failure rewind mechanism.
-/// Plays an on-screen eye closing effect, reveals a clock spinning backward in time
-/// with reverse ticking and time-warp audio, closes the eye again, adds 5 seconds,
-/// and reopens the eye as if the fatal action never happened.
+/// Features authentic hand-drawn clock artwork (saadut.png, saadurt.png, saaut.png),
+/// smooth eyelid blink transitions, counter-clockwise hand rotation, reverse ticking
+/// & time-warp audio, concise high-impact Cause of Death presentation, and dynamic
+/// time extension (+15s / +5s).
 /// </summary>
 public class TimeRewindController : MonoBehaviour
 {
     public static TimeRewindController Instance { get; private set; }
+
+    [Header("Clock Sprites (Optional Inspector Overrides)")]
+    [SerializeField] private Sprite customClockBackground;
+    [SerializeField] private Sprite customMinuteHand;
+    [SerializeField] private Sprite customHourHand;
 
     [Header("Audio Settings (Optional Inspector Overrides)")]
     [SerializeField] private AudioClip customRewindWhoosh;
@@ -42,15 +49,20 @@ public class TimeRewindController : MonoBehaviour
     // Clock UI Structure
     private GameObject clockRoot;
     private RectTransform clockPanel;
+    private Image clockBackdropImage;
     private RectTransform hourHand;
     private RectTransform minuteHand;
-    private RectTransform secondHand;
+    private Image hourHandImage;
+    private Image minuteHandImage;
     private Image clockAura;
-    private TMP_Text headerText;
-    private TMP_Text remainingLoopsText;
-    private TMP_Text digitalClockText;
-    private TMP_Text reasonText;
+
+    // Text Display Structure (Polished, punchy hierarchy)
+    private TMP_Text categoryTagText;
+    private TMP_Text primaryTitleText;
+    private TMP_Text survivalRuleText;
     private TMP_Text bonusBadgeText;
+    private TMP_Text promptText;
+    private TMP_Text digitalClockText;
 
     // Audio
     private AudioSource audioSource;
@@ -60,6 +72,11 @@ public class TimeRewindController : MonoBehaviour
     private AudioClip synthEyelidThump;
 
     private bool isRewinding = false;
+
+    // Normalized pivot of the clock hands on the 1920x1080 canvas
+    // Nut center in saadut/saaut: X = 957.53, Y = 527.63 (from top-left)
+    // Normalized in Unity UI (bottom-left origin): (957.53 / 1920, (1080 - 527.63) / 1080)
+    private readonly Vector2 clockCenterPivot = new Vector2(0.49871f, 0.51145f);
 
     private void Awake()
     {
@@ -91,7 +108,91 @@ public class TimeRewindController : MonoBehaviour
         audioSource.ignoreListenerPause = true;
     }
 
-    #region --- PROCEDURAL UI CONSTRUCTION ---
+    #region --- SPRITE RESOLUTION ---
+
+    /// <summary>
+    /// Loads a clock sprite with high-reliability multi-tier fallbacks:
+    /// 1. Inspector override
+    /// 2. Resources.Load
+    /// 3. Resources.LoadAll (for sliced sprite sheets)
+    /// 4. AssetDatabase (Editor)
+    /// 5. Raw file byte loader (Runtime / disk fallback)
+    /// </summary>
+    private Sprite EnsureFullScreenSprite(Sprite sprite, Vector2 pivot)
+    {
+        if (sprite == null) return null;
+        if (sprite.texture != null && (sprite.rect.width < 1920 || sprite.rect.height < 1080))
+        {
+            return Sprite.Create(sprite.texture, new Rect(0, 0, sprite.texture.width, sprite.texture.height), pivot, 100f);
+        }
+        return sprite;
+    }
+
+    private Sprite ResolveClockSprite(Sprite inspectorOverride, string fileName, Vector2 pivot)
+    {
+        if (inspectorOverride != null) return EnsureFullScreenSprite(inspectorOverride, pivot);
+
+        string baseName = Path.GetFileNameWithoutExtension(fileName);
+
+        // 1. Try Resources.Load
+        Sprite res = Resources.Load<Sprite>("TimeRewind/" + baseName);
+        if (res == null) res = Resources.Load<Sprite>(baseName);
+        if (res != null) return EnsureFullScreenSprite(res, pivot);
+
+        // 2. Try Resources.LoadAll (for multiple sprite sheets)
+        Sprite[] allRes = Resources.LoadAll<Sprite>("TimeRewind/" + baseName);
+        if (allRes != null && allRes.Length > 0) return EnsureFullScreenSprite(allRes[0], pivot);
+
+#if UNITY_EDITOR
+        // 3. Try AssetDatabase in Editor
+        string assetPath = "Assets/MainScene/Sprite/" + fileName;
+        Sprite adSprite = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>(assetPath);
+        if (adSprite != null) return EnsureFullScreenSprite(adSprite, pivot);
+
+        UnityEngine.Object[] assets = UnityEditor.AssetDatabase.LoadAllAssetsAtPath(assetPath);
+        if (assets != null)
+        {
+            foreach (var a in assets)
+            {
+                if (a is Sprite s) return EnsureFullScreenSprite(s, pivot);
+            }
+        }
+#endif
+
+        // 4. Runtime raw PNG file fallback
+        string[] candidatePaths = new string[]
+        {
+            Path.Combine(Application.dataPath, "MainScene/Sprite", fileName),
+            Path.Combine(Application.dataPath, "Resources/TimeRewind", fileName),
+            Path.Combine(Application.dataPath, "Resources", fileName)
+        };
+
+        foreach (string path in candidatePaths)
+        {
+            if (File.Exists(path))
+            {
+                try
+                {
+                    byte[] bytes = File.ReadAllBytes(path);
+                    Texture2D tex = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+                    if (tex.LoadImage(bytes))
+                    {
+                        return Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), pivot, 100f);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning($"[TimeRewind] Could not load sprite from {path}: {ex.Message}");
+                }
+            }
+        }
+
+        return null;
+    }
+
+    #endregion
+
+    #region --- REWIND OVERLAY & UI CONSTRUCTION ---
 
     private void BuildRewindOverlayUI()
     {
@@ -118,6 +219,257 @@ public class TimeRewindController : MonoBehaviour
         BuildEyelidsUI(canvasObj);
     }
 
+    private void BuildClockUI(GameObject parent)
+    {
+        clockRoot = new GameObject("ClockRoot");
+        clockRoot.transform.SetParent(parent.transform, false);
+        RectTransform rootRect = clockRoot.AddComponent<RectTransform>();
+        rootRect.anchorMin = Vector2.zero;
+        rootRect.anchorMax = Vector2.one;
+        rootRect.sizeDelta = Vector2.zero;
+
+        // Dark ambient backdrop (behind clock tiles)
+        GameObject bgObj = new GameObject("DarkBackdrop");
+        bgObj.transform.SetParent(clockRoot.transform, false);
+        RectTransform bgRect = bgObj.AddComponent<RectTransform>();
+        bgRect.anchorMin = Vector2.zero;
+        bgRect.anchorMax = Vector2.one;
+        bgRect.sizeDelta = Vector2.zero;
+        Image bgImg = bgObj.AddComponent<Image>();
+        bgImg.color = new Color(0.02f, 0.02f, 0.03f, 1f);
+        bgImg.raycastTarget = false;
+
+        // Clock Panel Container (1920x1080 full screen)
+        GameObject panelObj = new GameObject("ClockPanel");
+        panelObj.transform.SetParent(clockRoot.transform, false);
+        clockPanel = panelObj.AddComponent<RectTransform>();
+        clockPanel.anchorMin = new Vector2(0.5f, 0.5f);
+        clockPanel.anchorMax = new Vector2(0.5f, 0.5f);
+        clockPanel.pivot = new Vector2(0.5f, 0.5f);
+        clockPanel.sizeDelta = new Vector2(1920f, 1080f);
+
+        // Main Clock Background (saadut.png: clock on tiled wall)
+        Sprite bgSprite = ResolveClockSprite(customClockBackground, "saadut.png", new Vector2(0.5f, 0.5f));
+        GameObject clockBgObj = new GameObject("ClockBackground");
+        clockBgObj.transform.SetParent(clockPanel, false);
+        RectTransform clockBgRect = clockBgObj.AddComponent<RectTransform>();
+        clockBgRect.anchorMin = Vector2.zero;
+        clockBgRect.anchorMax = Vector2.one;
+        clockBgRect.sizeDelta = Vector2.zero;
+        clockBackdropImage = clockBgObj.AddComponent<Image>();
+        if (bgSprite != null)
+        {
+            clockBackdropImage.sprite = bgSprite;
+            clockBackdropImage.preserveAspect = true;
+        }
+        else
+        {
+            clockBackdropImage.sprite = GenerateClockFaceSprite();
+        }
+        clockBackdropImage.color = Color.white;
+        clockBackdropImage.raycastTarget = false;
+
+        // Subtle Radial Aura Pulse (surrounds clock center)
+        GameObject auraObj = new GameObject("ClockAura");
+        auraObj.transform.SetParent(clockPanel, false);
+        RectTransform auraRect = auraObj.AddComponent<RectTransform>();
+        auraRect.anchorMin = new Vector2(0.5f, 0.5f);
+        auraRect.anchorMax = new Vector2(0.5f, 0.5f);
+        auraRect.pivot = new Vector2(0.5f, 0.5f);
+        auraRect.anchoredPosition = new Vector2(-2.5f, 12.4f);
+        auraRect.sizeDelta = new Vector2(620f, 620f);
+        clockAura = auraObj.AddComponent<Image>();
+        clockAura.sprite = GenerateCircleSprite(256, 128);
+        clockAura.color = new Color(0.2f, 0.75f, 1f, 0.25f);
+        clockAura.raycastTarget = false;
+
+        // Minute Hand (saadurt.png)
+        Sprite minuteSprite = ResolveClockSprite(customMinuteHand, "saadurt.png", clockCenterPivot);
+        GameObject minObj = new GameObject("MinuteHand");
+        minObj.transform.SetParent(clockPanel, false);
+        minuteHand = minObj.AddComponent<RectTransform>();
+        minuteHand.anchorMin = new Vector2(0.5f, 0.5f);
+        minuteHand.anchorMax = new Vector2(0.5f, 0.5f);
+        minuteHand.pivot = clockCenterPivot;
+        minuteHand.sizeDelta = new Vector2(1920f, 1080f);
+        minuteHand.anchoredPosition = Vector2.zero;
+        minuteHandImage = minObj.AddComponent<Image>();
+        if (minuteSprite != null)
+        {
+            minuteHandImage.sprite = minuteSprite;
+            minuteHandImage.preserveAspect = true;
+        }
+        else
+        {
+            minuteHandImage.sprite = GenerateHandSprite(20, 200, new Color(0.95f, 0.88f, 0.65f, 1f));
+        }
+        minuteHandImage.raycastTarget = false;
+
+        // Hour Hand (saaut.png with center circular nut)
+        Sprite hourSprite = ResolveClockSprite(customHourHand, "saaut.png", clockCenterPivot);
+        GameObject hourObj = new GameObject("HourHand");
+        hourObj.transform.SetParent(clockPanel, false);
+        hourHand = hourObj.AddComponent<RectTransform>();
+        hourHand.anchorMin = new Vector2(0.5f, 0.5f);
+        hourHand.anchorMax = new Vector2(0.5f, 0.5f);
+        hourHand.pivot = clockCenterPivot;
+        hourHand.sizeDelta = new Vector2(1920f, 1080f);
+        hourHand.anchoredPosition = Vector2.zero;
+        hourHandImage = hourObj.AddComponent<Image>();
+        if (hourSprite != null)
+        {
+            hourHandImage.sprite = hourSprite;
+            hourHandImage.preserveAspect = true;
+        }
+        else
+        {
+            hourHandImage.sprite = GenerateHandSprite(26, 140, new Color(0.88f, 0.75f, 0.35f, 1f));
+        }
+        hourHandImage.raycastTarget = false;
+
+        // Ambient Screen Vignette (softly shades the edges so text stands out sharply)
+        GameObject vigObj = new GameObject("VignetteFraming");
+        vigObj.transform.SetParent(clockRoot.transform, false);
+        RectTransform vigRect = vigObj.AddComponent<RectTransform>();
+        vigRect.anchorMin = Vector2.zero;
+        vigRect.anchorMax = Vector2.one;
+        vigRect.sizeDelta = Vector2.zero;
+        Image vigImg = vigObj.AddComponent<Image>();
+        vigImg.sprite = GenerateVignetteSprite();
+        vigImg.color = new Color(0f, 0f, 0f, 0.35f);
+        vigImg.raycastTarget = false;
+
+        // Digital Rolling Time Text (below the clock dial)
+        GameObject digObj = new GameObject("DigitalClockText");
+        digObj.transform.SetParent(clockRoot.transform, false);
+        RectTransform digRect = digObj.AddComponent<RectTransform>();
+        digRect.anchorMin = new Vector2(0.5f, 0.5f);
+        digRect.anchorMax = new Vector2(0.5f, 0.5f);
+        digRect.pivot = new Vector2(0.5f, 0.5f);
+        digRect.anchoredPosition = new Vector2(0f, -320f);
+        digRect.sizeDelta = new Vector2(400f, 50f);
+        digitalClockText = digObj.AddComponent<TextMeshProUGUI>();
+        digitalClockText.text = "00:00";
+        digitalClockText.fontSize = 32;
+        digitalClockText.fontStyle = FontStyles.Bold;
+        digitalClockText.alignment = TextAlignmentOptions.Center;
+        digitalClockText.color = new Color(1f, 0.9f, 0.45f, 0.95f);
+
+        // -------------------------------------------------------------
+        // TOP CARD: Category Tag & Primary Cause / Objective
+        // -------------------------------------------------------------
+        GameObject topCardObj = new GameObject("TopCard");
+        topCardObj.transform.SetParent(clockRoot.transform, false);
+        RectTransform topCardRect = topCardObj.AddComponent<RectTransform>();
+        topCardRect.anchorMin = new Vector2(0.5f, 1f);
+        topCardRect.anchorMax = new Vector2(0.5f, 1f);
+        topCardRect.pivot = new Vector2(0.5f, 1f);
+        topCardRect.anchoredPosition = new Vector2(0f, -15f);
+        topCardRect.sizeDelta = new Vector2(1460f, 130f);
+
+        Image topCardBg = topCardObj.AddComponent<Image>();
+        topCardBg.color = new Color(0.04f, 0.05f, 0.08f, 0.88f);
+        topCardBg.raycastTarget = false;
+
+        // Category Tag ("CAUSE OF DEATH" / "TIMELINE RESET")
+        GameObject catObj = new GameObject("CategoryTagText");
+        catObj.transform.SetParent(topCardObj.transform, false);
+        RectTransform catRect = catObj.AddComponent<RectTransform>();
+        catRect.anchorMin = new Vector2(0.5f, 1f);
+        catRect.anchorMax = new Vector2(0.5f, 1f);
+        catRect.pivot = new Vector2(0.5f, 1f);
+        catRect.anchoredPosition = new Vector2(0f, -12f);
+        catRect.sizeDelta = new Vector2(1400f, 32f);
+        categoryTagText = catObj.AddComponent<TextMeshProUGUI>();
+        categoryTagText.text = "CAUSE OF DEATH";
+        categoryTagText.fontSize = 20;
+        categoryTagText.fontStyle = FontStyles.Bold;
+        categoryTagText.characterSpacing = 4f;
+        categoryTagText.alignment = TextAlignmentOptions.Center;
+        categoryTagText.color = new Color(1f, 0.35f, 0.35f, 1f);
+
+        // Primary Title ("IGNITED NATURAL GAS LEAK" / "60 SECONDS BEFORE EARTHQUAKE — BE READY!")
+        GameObject titleObj = new GameObject("PrimaryTitleText");
+        titleObj.transform.SetParent(topCardObj.transform, false);
+        RectTransform titleRect = titleObj.AddComponent<RectTransform>();
+        titleRect.anchorMin = new Vector2(0.5f, 0f);
+        titleRect.anchorMax = new Vector2(0.5f, 1f);
+        titleRect.pivot = new Vector2(0.5f, 0.5f);
+        titleRect.anchoredPosition = new Vector2(0f, -14f);
+        titleRect.sizeDelta = new Vector2(1400f, 65f);
+        primaryTitleText = titleObj.AddComponent<TextMeshProUGUI>();
+        primaryTitleText.text = "FATAL HAZARD";
+        primaryTitleText.fontSize = 38;
+        primaryTitleText.fontStyle = FontStyles.Bold;
+        primaryTitleText.alignment = TextAlignmentOptions.Center;
+        primaryTitleText.color = Color.white;
+
+        // -------------------------------------------------------------
+        // BOTTOM CARD: Survival Rule, Restored Time Badge, Continue Prompt
+        // -------------------------------------------------------------
+        GameObject botCardObj = new GameObject("BottomCard");
+        botCardObj.transform.SetParent(clockRoot.transform, false);
+        RectTransform botCardRect = botCardObj.AddComponent<RectTransform>();
+        botCardRect.anchorMin = new Vector2(0.5f, 0f);
+        botCardRect.anchorMax = new Vector2(0.5f, 0f);
+        botCardRect.pivot = new Vector2(0.5f, 0f);
+        botCardRect.anchoredPosition = new Vector2(0f, 15f);
+        botCardRect.sizeDelta = new Vector2(1460f, 140f);
+
+        Image botCardBg = botCardObj.AddComponent<Image>();
+        botCardBg.color = new Color(0.04f, 0.05f, 0.08f, 0.90f);
+        botCardBg.raycastTarget = false;
+
+        // Survival Rule ("NEVER flip light switches when smelling gas!")
+        GameObject ruleObj = new GameObject("SurvivalRuleText");
+        ruleObj.transform.SetParent(botCardObj.transform, false);
+        RectTransform ruleRect = ruleObj.AddComponent<RectTransform>();
+        ruleRect.anchorMin = new Vector2(0.5f, 1f);
+        ruleRect.anchorMax = new Vector2(0.5f, 1f);
+        ruleRect.pivot = new Vector2(0.5f, 1f);
+        ruleRect.anchoredPosition = new Vector2(0f, -12f);
+        ruleRect.sizeDelta = new Vector2(1400f, 36f);
+        survivalRuleText = ruleObj.AddComponent<TextMeshProUGUI>();
+        survivalRuleText.text = "";
+        survivalRuleText.fontSize = 24;
+        survivalRuleText.fontStyle = FontStyles.Bold;
+        survivalRuleText.alignment = TextAlignmentOptions.Center;
+        survivalRuleText.color = new Color(1f, 0.88f, 0.42f, 1f);
+
+        // Bonus Time / Loops Badge ("+15s ADDED TO TIMELINE    (LOOPS: 2/3)")
+        GameObject badgeObj = new GameObject("BonusBadgeText");
+        badgeObj.transform.SetParent(botCardObj.transform, false);
+        RectTransform badgeRect = badgeObj.AddComponent<RectTransform>();
+        badgeRect.anchorMin = new Vector2(0.5f, 0.5f);
+        badgeRect.anchorMax = new Vector2(0.5f, 0.5f);
+        badgeRect.pivot = new Vector2(0.5f, 0.5f);
+        badgeRect.anchoredPosition = new Vector2(0f, -5f);
+        badgeRect.sizeDelta = new Vector2(1400f, 40f);
+        bonusBadgeText = badgeObj.AddComponent<TextMeshProUGUI>();
+        bonusBadgeText.text = "+15s ADDED TO TIMELINE";
+        bonusBadgeText.fontSize = 28;
+        bonusBadgeText.fontStyle = FontStyles.Bold;
+        bonusBadgeText.alignment = TextAlignmentOptions.Center;
+        bonusBadgeText.color = new Color(0.15f, 1f, 0.65f, 1f);
+
+        // Prompt Text ("[ Press SPACE or Click to Continue ]")
+        GameObject promptObj = new GameObject("PromptText");
+        promptObj.transform.SetParent(botCardObj.transform, false);
+        RectTransform promptRect = promptObj.AddComponent<RectTransform>();
+        promptRect.anchorMin = new Vector2(0.5f, 0f);
+        promptRect.anchorMax = new Vector2(0.5f, 0f);
+        promptRect.pivot = new Vector2(0.5f, 0f);
+        promptRect.anchoredPosition = new Vector2(0f, 10f);
+        promptRect.sizeDelta = new Vector2(1400f, 26f);
+        promptText = promptObj.AddComponent<TextMeshProUGUI>();
+        promptText.text = "[ Press SPACE / E or Click to Continue ]";
+        promptText.fontSize = 17;
+        promptText.alignment = TextAlignmentOptions.Center;
+        promptText.color = new Color(0.72f, 0.76f, 0.82f, 0.85f);
+
+        clockRoot.SetActive(false);
+    }
+
     private void BuildEyelidsUI(GameObject parent)
     {
         eyelidsRoot = new GameObject("EyelidsRoot");
@@ -127,7 +479,6 @@ public class TimeRewindController : MonoBehaviour
         rootRect.anchorMax = Vector2.one;
         rootRect.sizeDelta = Vector2.zero;
 
-        // Procedural Eyelid Sprites
         Sprite topEyelidSprite = GenerateTopEyelidSprite();
         Sprite bottomEyelidSprite = GenerateBottomEyelidSprite();
 
@@ -138,7 +489,7 @@ public class TimeRewindController : MonoBehaviour
         topEyelid.anchorMin = new Vector2(0f, 0.5f);
         topEyelid.anchorMax = new Vector2(1f, 1f);
         topEyelid.pivot = new Vector2(0.5f, 0f);
-        topEyelid.sizeDelta = new Vector2(400f, 650f); // Extra bleed over all edges
+        topEyelid.sizeDelta = new Vector2(400f, 650f);
         topEyelidImage = topObj.AddComponent<Image>();
         topEyelidImage.sprite = topEyelidSprite;
         topEyelidImage.type = Image.Type.Simple;
@@ -159,7 +510,7 @@ public class TimeRewindController : MonoBehaviour
         bottomEyelidImage.color = Color.black;
         bottomEyelidImage.raycastTarget = false;
 
-        // Center Slit Vignette (darkens edges and center seam)
+        // Center Slit Vignette
         GameObject vigObj = new GameObject("EyeVignette");
         vigObj.transform.SetParent(eyelidsRoot.transform, false);
         RectTransform vigRect = vigObj.AddComponent<RectTransform>();
@@ -183,177 +534,192 @@ public class TimeRewindController : MonoBehaviour
         fullBlackOverlay.raycastTarget = false;
     }
 
-    private void BuildClockUI(GameObject parent)
+    #endregion
+
+    #region --- REASON PARSING & POLISHED PRESENTATION ---
+
+    public struct FormattedRewindReason
     {
-        clockRoot = new GameObject("ClockRoot");
-        clockRoot.transform.SetParent(parent.transform, false);
-        RectTransform rootRect = clockRoot.AddComponent<RectTransform>();
-        rootRect.anchorMin = Vector2.zero;
-        rootRect.anchorMax = Vector2.one;
-        rootRect.sizeDelta = Vector2.zero;
+        public string categoryTag;
+        public string primaryTitle;
+        public string survivalRule;
+        public Color tagColor;
+        public Color titleColor;
+    }
 
-        // Dark background backdrop
-        GameObject bgObj = new GameObject("DarkBackdrop");
-        bgObj.transform.SetParent(clockRoot.transform, false);
-        RectTransform bgRect = bgObj.AddComponent<RectTransform>();
-        bgRect.anchorMin = Vector2.zero;
-        bgRect.anchorMax = Vector2.one;
-        bgRect.sizeDelta = Vector2.zero;
-        Image bgImg = bgObj.AddComponent<Image>();
-        bgImg.color = new Color(0.02f, 0.03f, 0.05f, 0.94f);
-        bgImg.raycastTarget = false;
+    /// <summary>
+    /// Parses educational reasons into punchy, high-importance headings & 1-line takeaways:
+    /// "less text, more importance" focusing on the Cause of Death.
+    /// </summary>
+    public static FormattedRewindReason FormatReason(string rawReason)
+    {
+        if (string.IsNullOrEmpty(rawReason))
+        {
+            return new FormattedRewindReason
+            {
+                categoryTag = "CAUSE OF DEATH",
+                primaryTitle = "FATAL MISTAKE",
+                survivalRule = "Stay alert and follow earthquake safety procedures!",
+                tagColor = new Color(1f, 0.35f, 0.35f, 1f),
+                titleColor = Color.white
+            };
+        }
 
-        // Clock Panel Container
-        GameObject panelObj = new GameObject("ClockPanel");
-        panelObj.transform.SetParent(clockRoot.transform, false);
-        clockPanel = panelObj.AddComponent<RectTransform>();
-        clockPanel.anchorMin = new Vector2(0.5f, 0.55f);
-        clockPanel.anchorMax = new Vector2(0.5f, 0.55f);
-        clockPanel.pivot = new Vector2(0.5f, 0.5f);
-        clockPanel.sizeDelta = new Vector2(480f, 480f);
+        string lower = rawReason.ToLowerInvariant();
 
-        // Pulsing Aura Ring
-        GameObject auraObj = new GameObject("ClockAura");
-        auraObj.transform.SetParent(clockPanel, false);
-        RectTransform auraRect = auraObj.AddComponent<RectTransform>();
-        auraRect.anchorMin = Vector2.zero;
-        auraRect.anchorMax = Vector2.one;
-        auraRect.sizeDelta = new Vector2(120f, 120f);
-        clockAura = auraObj.AddComponent<Image>();
-        clockAura.sprite = GenerateCircleSprite(256, 128);
-        clockAura.color = new Color(0.2f, 0.7f, 1f, 0.35f);
-        clockAura.raycastTarget = false;
+        // 1. Gas Explosion from Light Switch or Sparks
+        if (lower.Contains("switch") || lower.Contains("spark") || lower.Contains("explosion") || lower.Contains("gas"))
+        {
+            if (lower.Contains("valve") || lower.Contains("broken fixtures") || lower.Contains("lingered"))
+            {
+                return new FormattedRewindReason
+                {
+                    categoryTag = "CAUSE OF DEATH",
+                    primaryTitle = "LINGERED IN LEAKING GAS",
+                    survivalRule = "Evacuate immediately if you cannot safely shut off the main gas valve!",
+                    tagColor = new Color(1f, 0.35f, 0.35f, 1f),
+                    titleColor = new Color(1f, 0.45f, 0.45f, 1f)
+                };
+            }
+            return new FormattedRewindReason
+            {
+                categoryTag = "CAUSE OF DEATH",
+                primaryTitle = "ELECTRICAL SPARK IGNITED GAS LEAK",
+                survivalRule = "NEVER flip light switches or create electrical sparks when you smell gas!",
+                tagColor = new Color(1f, 0.35f, 0.35f, 1f),
+                titleColor = new Color(1f, 0.4f, 0.4f, 1f)
+            };
+        }
 
-        // Clock Face Dial
-        GameObject dialObj = new GameObject("ClockDial");
-        dialObj.transform.SetParent(clockPanel, false);
-        RectTransform dialRect = dialObj.AddComponent<RectTransform>();
-        dialRect.anchorMin = Vector2.zero;
-        dialRect.anchorMax = Vector2.one;
-        dialRect.sizeDelta = Vector2.zero;
-        Image dialImg = dialObj.AddComponent<Image>();
-        dialImg.sprite = GenerateClockFaceSprite();
-        dialImg.color = Color.white;
-        dialImg.raycastTarget = false;
+        // 2. Heavy Wall Painting / Falling Frame
+        if (lower.Contains("painting") || lower.Contains("wall hangings") || lower.Contains("shattered glass"))
+        {
+            return new FormattedRewindReason
+            {
+                categoryTag = "CAUSE OF DEATH",
+                primaryTitle = "UNSECURED WALL HANGING FELL",
+                survivalRule = "Always remove or securely anchor heavy frames & mirrors above desks and beds!",
+                tagColor = new Color(1f, 0.35f, 0.35f, 1f),
+                titleColor = new Color(1f, 0.45f, 0.45f, 1f)
+            };
+        }
 
-        // Hour Hand
-        GameObject hourObj = new GameObject("HourHand");
-        hourObj.transform.SetParent(clockPanel, false);
-        hourHand = hourObj.AddComponent<RectTransform>();
-        hourHand.anchorMin = new Vector2(0.5f, 0.5f);
-        hourHand.anchorMax = new Vector2(0.5f, 0.5f);
-        hourHand.pivot = new Vector2(0.5f, 0.15f);
-        hourHand.sizeDelta = new Vector2(26f, 130f);
-        Image hourImg = hourObj.AddComponent<Image>();
-        hourImg.sprite = GenerateHandSprite(26, 130, new Color(0.88f, 0.75f, 0.35f, 1f));
-        hourImg.raycastTarget = false;
+        // 3. Candle Fire
+        if (lower.Contains("candle") || lower.Contains("fire") || lower.Contains("open flames") || lower.Contains("igniting"))
+        {
+            return new FormattedRewindReason
+            {
+                categoryTag = "CAUSE OF DEATH",
+                primaryTitle = "TOPPLED CANDLE IGNITED APARTMENT FIRE",
+                survivalRule = "Always extinguish open flames and candles before an earthquake strikes!",
+                tagColor = new Color(1f, 0.45f, 0.2f, 1f),
+                titleColor = new Color(1f, 0.55f, 0.25f, 1f)
+            };
+        }
 
-        // Minute Hand
-        GameObject minObj = new GameObject("MinuteHand");
-        minObj.transform.SetParent(clockPanel, false);
-        minuteHand = minObj.AddComponent<RectTransform>();
-        minuteHand.anchorMin = new Vector2(0.5f, 0.5f);
-        minuteHand.anchorMax = new Vector2(0.5f, 0.5f);
-        minuteHand.pivot = new Vector2(0.5f, 0.12f);
-        minuteHand.sizeDelta = new Vector2(20f, 185f);
-        Image minImg = minObj.AddComponent<Image>();
-        minImg.sprite = GenerateHandSprite(20, 185, new Color(0.95f, 0.88f, 0.65f, 1f));
-        minImg.raycastTarget = false;
+        // 4. Running during tremor
+        if (lower.Contains("lateral") || lower.Contains("never run") || lower.Contains("run while"))
+        {
+            return new FormattedRewindReason
+            {
+                categoryTag = "CAUSE OF DEATH",
+                primaryTitle = "RAN DURING VIOLENT SHAKING",
+                survivalRule = "Never run during shaking — Drop, Cover, and Hold On immediately!",
+                tagColor = new Color(1f, 0.35f, 0.35f, 1f),
+                titleColor = new Color(1f, 0.45f, 0.45f, 1f)
+            };
+        }
 
-        // Second Hand
-        GameObject secObj = new GameObject("SecondHand");
-        secObj.transform.SetParent(clockPanel, false);
-        secondHand = secObj.AddComponent<RectTransform>();
-        secondHand.anchorMin = new Vector2(0.5f, 0.5f);
-        secondHand.anchorMax = new Vector2(0.5f, 0.5f);
-        secondHand.pivot = new Vector2(0.5f, 0.2f);
-        secondHand.sizeDelta = new Vector2(8f, 215f);
-        Image secImg = secObj.AddComponent<Image>();
-        secImg.sprite = GenerateHandSprite(8, 215, new Color(1f, 0.35f, 0.25f, 1f));
-        secImg.raycastTarget = false;
+        // 5. Freeze in panic / Timeout during tremor
+        if (lower.Contains("frozen in panic") || lower.Contains("drop under sturdy") || lower.Contains("knocks you down"))
+        {
+            return new FormattedRewindReason
+            {
+                categoryTag = "CAUSE OF DEATH",
+                primaryTitle = "FROZEN IN PANIC",
+                survivalRule = "Drop under sturdy furniture within seconds before violent shaking knocks you down!",
+                tagColor = new Color(1f, 0.35f, 0.35f, 1f),
+                titleColor = new Color(1f, 0.45f, 0.45f, 1f)
+            };
+        }
 
-        // Center Brass Pin
-        GameObject pinObj = new GameObject("CenterPin");
-        pinObj.transform.SetParent(clockPanel, false);
-        RectTransform pinRect = pinObj.AddComponent<RectTransform>();
-        pinRect.anchorMin = new Vector2(0.5f, 0.5f);
-        pinRect.anchorMax = new Vector2(0.5f, 0.5f);
-        pinRect.sizeDelta = new Vector2(36f, 36f);
-        Image pinImg = pinObj.AddComponent<Image>();
-        pinImg.sprite = GenerateCircleSprite(64, 30);
-        pinImg.color = new Color(0.95f, 0.82f, 0.45f, 1f);
-        pinImg.raycastTarget = false;
+        // 6. Shifting Cabinet / Aftershock
+        if (lower.Contains("cabinet") || lower.Contains("aftershock") || lower.Contains("overhead obstacles"))
+        {
+            return new FormattedRewindReason
+            {
+                categoryTag = "CAUSE OF DEATH",
+                primaryTitle = "CABINET COLLAPSE INJURY",
+                survivalRule = "React quickly to avoid shifting heavy furniture during aftershocks!",
+                tagColor = new Color(1f, 0.35f, 0.35f, 1f),
+                titleColor = new Color(1f, 0.45f, 0.45f, 1f)
+            };
+        }
 
-        // Text: Header ("REWINDING TIMELINE...")
-        GameObject headerObj = new GameObject("HeaderText");
-        headerObj.transform.SetParent(clockRoot.transform, false);
-        RectTransform headerRect = headerObj.AddComponent<RectTransform>();
-        headerRect.anchorMin = new Vector2(0.5f, 0.86f);
-        headerRect.anchorMax = new Vector2(0.5f, 0.86f);
-        headerRect.sizeDelta = new Vector2(800f, 60f);
-        headerText = headerObj.AddComponent<TextMeshProUGUI>();
-        headerText.text = "REWINDING TIME";
-        headerText.fontSize = 42;
-        headerText.fontStyle = FontStyles.Bold;
-        headerText.alignment = TextAlignmentOptions.Center;
-        headerText.color = new Color(0.35f, 0.85f, 1f, 1f);
+        // 7. Navigation in Dark / Missing Flashlight
+        if (lower.Contains("flashlight") || lower.Contains("in the dark") || lower.Contains("total darkness"))
+        {
+            if (lower.Contains("stairs") || lower.Contains("planter"))
+            {
+                return new FormattedRewindReason
+                {
+                    categoryTag = "CAUSE OF DEATH",
+                    primaryTitle = "FELL DOWN DARK STAIRS",
+                    survivalRule = "Never navigate darkened stairwells without emergency lighting!",
+                    tagColor = new Color(1f, 0.35f, 0.35f, 1f),
+                    titleColor = new Color(1f, 0.45f, 0.45f, 1f)
+                };
+            }
+            return new FormattedRewindReason
+            {
+                categoryTag = "CAUSE OF DEATH",
+                primaryTitle = "SEARCHING IN TOTAL DARKNESS",
+                survivalRule = "A packed emergency flashlight is essential for post-quake navigation & shut-offs!",
+                tagColor = new Color(1f, 0.35f, 0.35f, 1f),
+                titleColor = new Color(1f, 0.45f, 0.45f, 1f)
+            };
+        }
 
-        // Text: Loops Remaining Counter
-        GameObject loopsObj = new GameObject("RemainingLoopsText");
-        loopsObj.transform.SetParent(clockRoot.transform, false);
-        RectTransform loopsRect = loopsObj.AddComponent<RectTransform>();
-        loopsRect.anchorMin = new Vector2(0.5f, 0.80f);
-        loopsRect.anchorMax = new Vector2(0.5f, 0.80f);
-        loopsRect.sizeDelta = new Vector2(800f, 40f);
-        remainingLoopsText = loopsObj.AddComponent<TextMeshProUGUI>();
-        remainingLoopsText.text = "TIME LOOPS REMAINING: 3 / 3";
-        remainingLoopsText.fontSize = 26;
-        remainingLoopsText.fontStyle = FontStyles.Bold;
-        remainingLoopsText.alignment = TextAlignmentOptions.Center;
-        remainingLoopsText.color = new Color(0.4f, 0.9f, 1f, 1f);
+        // 8. Falling Facade / Street debris
+        if (lower.Contains("facade") || lower.Contains("storefront") || lower.Contains("overhead hazards"))
+        {
+            return new FormattedRewindReason
+            {
+                categoryTag = "CAUSE OF DEATH",
+                primaryTitle = "STRUCK BY FALLING FACADE",
+                survivalRule = "Watch overhead hazards & falling glass when stepping onto the street!",
+                tagColor = new Color(1f, 0.35f, 0.35f, 1f),
+                titleColor = new Color(1f, 0.45f, 0.45f, 1f)
+            };
+        }
 
-        // Text: Digital Rolling Counter
-        GameObject digObj = new GameObject("DigitalClockText");
-        digObj.transform.SetParent(clockRoot.transform, false);
-        RectTransform digRect = digObj.AddComponent<RectTransform>();
-        digRect.anchorMin = new Vector2(0.5f, 0.26f);
-        digRect.anchorMax = new Vector2(0.5f, 0.26f);
-        digRect.sizeDelta = new Vector2(500f, 60f);
-        digitalClockText = digObj.AddComponent<TextMeshProUGUI>();
-        digitalClockText.text = "00:00";
-        digitalClockText.fontSize = 48;
-        digitalClockText.fontStyle = FontStyles.Bold;
-        digitalClockText.alignment = TextAlignmentOptions.Center;
-        digitalClockText.color = new Color(1f, 0.9f, 0.5f, 1f);
+        // 9. Vehicle Gridlock
+        if (lower.Contains("gridlock") || lower.Contains("car") || lower.Contains("drivers"))
+        {
+            return new FormattedRewindReason
+            {
+                categoryTag = "CAUSE OF DEATH",
+                primaryTitle = "TRAPPED IN VEHICLE GRIDLOCK",
+                survivalRule = "Never evacuate by car — keep roads completely clear for emergency vehicles!",
+                tagColor = new Color(1f, 0.35f, 0.35f, 1f),
+                titleColor = new Color(1f, 0.45f, 0.45f, 1f)
+            };
+        }
 
-        // Text: +5s Bonus Badge
-        GameObject bonusObj = new GameObject("BonusBadgeText");
-        bonusObj.transform.SetParent(clockRoot.transform, false);
-        RectTransform bonusRect = bonusObj.AddComponent<RectTransform>();
-        bonusRect.anchorMin = new Vector2(0.5f, 0.18f);
-        bonusRect.anchorMax = new Vector2(0.5f, 0.18f);
-        bonusRect.sizeDelta = new Vector2(600f, 50f);
-        bonusBadgeText = bonusObj.AddComponent<TextMeshProUGUI>();
-        bonusBadgeText.text = "+5 SECONDS RESTORED";
-        bonusBadgeText.fontSize = 32;
-        bonusBadgeText.fontStyle = FontStyles.Bold;
-        bonusBadgeText.alignment = TextAlignmentOptions.Center;
-        bonusBadgeText.color = new Color(0.4f, 1f, 0.5f, 1f);
+        // Fallback: Smart Split
+        string[] parts = rawReason.Split(new char[] { ':', '!' }, StringSplitOptions.RemoveEmptyEntries);
+        string cat = "CAUSE OF DEATH";
+        string title = parts.Length > 0 ? parts[0].Trim().ToUpper() : "FATAL MISTAKE";
+        string rule = parts.Length > 1 ? parts[parts.Length - 1].Trim() : rawReason;
 
-        // Text: Reason / Educational Tip
-        GameObject reasonObj = new GameObject("ReasonText");
-        reasonObj.transform.SetParent(clockRoot.transform, false);
-        RectTransform reasonRect = reasonObj.AddComponent<RectTransform>();
-        reasonRect.anchorMin = new Vector2(0.5f, 0.10f);
-        reasonRect.anchorMax = new Vector2(0.5f, 0.10f);
-        reasonRect.sizeDelta = new Vector2(1000f, 70f);
-        reasonText = reasonObj.AddComponent<TextMeshProUGUI>();
-        reasonText.text = "";
-        reasonText.fontSize = 24;
-        reasonText.alignment = TextAlignmentOptions.Center;
-        reasonText.color = new Color(0.9f, 0.92f, 0.95f, 0.85f);
-
-        clockRoot.SetActive(false);
+        return new FormattedRewindReason
+        {
+            categoryTag = cat,
+            primaryTitle = title,
+            survivalRule = rule,
+            tagColor = new Color(1f, 0.35f, 0.35f, 1f),
+            titleColor = Color.white
+        };
     }
 
     #endregion
@@ -371,8 +737,7 @@ public class TimeRewindController : MonoBehaviour
         {
             for (int x = 0; x < width; x++)
             {
-                float u = (x / (float)(width - 1)) * 2f - 1f; // -1 .. 0 .. 1
-                // Gentle natural eyelid curve (dips 30px in the middle)
+                float u = (x / (float)(width - 1)) * 2f - 1f;
                 float curve = (1f - (u * u)) * 30f;
                 float edgeY = 35f - curve;
                 float dist = y - edgeY;
@@ -399,7 +764,6 @@ public class TimeRewindController : MonoBehaviour
             for (int x = 0; x < width; x++)
             {
                 float u = (x / (float)(width - 1)) * 2f - 1f;
-                // Mirrored: curves upward in the middle
                 float curve = (1f - (u * u)) * 30f;
                 float edgeY = (height - 35f) + curve;
                 float dist = edgeY - y;
@@ -454,62 +818,22 @@ public class TimeRewindController : MonoBehaviour
 
                 if (d <= radius)
                 {
-                    // Dark midnight dial background
                     float dialNorm = d / radius;
                     Color dialBg = Color.Lerp(new Color(0.08f, 0.12f, 0.18f, 1f), new Color(0.03f, 0.04f, 0.07f, 1f), dialNorm);
 
-                    // Outer brass/golden bezel
                     if (d >= radius - 18f)
                     {
-                        dialBg = new Color(0.85f, 0.70f, 0.28f, 1f); // Golden rim
+                        dialBg = new Color(0.85f, 0.70f, 0.28f, 1f);
                     }
-                    else if (d >= radius - 24f && d <= radius - 20f)
-                    {
-                        dialBg = new Color(0.35f, 0.28f, 0.10f, 1f); // Inner groove
-                    }
-                    else if (Mathf.Abs(d - 145f) < 2f)
-                    {
-                        dialBg = new Color(0.3f, 0.6f, 0.85f, 0.6f); // Inner decorative track
-                    }
-
                     c = dialBg;
                 }
 
-                // Anti-aliased outer circular border
                 if (d > radius - 2f && d <= radius + 2f)
                 {
                     c.a = Mathf.Clamp01(1f - (d - (radius - 2f)) / 4f);
                 }
 
                 pixels[y * size + x] = c;
-            }
-        }
-
-        // Draw 12 Hour Ticks
-        for (int h = 0; h < 12; h++)
-        {
-            float angle = h * (360f / 12f) * Mathf.Deg2Rad;
-            Vector2 dir = new Vector2(Mathf.Sin(angle), Mathf.Cos(angle));
-            bool isMajor = (h % 3 == 0); // 12, 3, 6, 9
-            float startR = isMajor ? 185f : 198f;
-            float endR = 216f;
-            int thickness = isMajor ? 5 : 3;
-
-            for (float r = startR; r <= endR; r += 0.5f)
-            {
-                Vector2 pos = center + dir * r;
-                for (int ox = -thickness; ox <= thickness; ox++)
-                {
-                    for (int oy = -thickness; oy <= thickness; oy++)
-                    {
-                        int px = Mathf.RoundToInt(pos.x + ox);
-                        int py = Mathf.RoundToInt(pos.y + oy);
-                        if (px >= 0 && px < size && py >= 0 && py < size)
-                        {
-                            pixels[py * size + px] = isMajor ? new Color(1f, 0.88f, 0.4f, 1f) : new Color(0.8f, 0.75f, 0.6f, 0.9f);
-                        }
-                    }
-                }
             }
         }
 
@@ -526,20 +850,13 @@ public class TimeRewindController : MonoBehaviour
         for (int y = 0; y < height; y++)
         {
             float normY = y / (float)(height - 1);
-            // Tapered hand shape towards tip
             float maxW = (width * 0.5f) * Mathf.Lerp(1.2f, 0.3f, normY);
 
             for (int x = 0; x < width; x++)
             {
                 float distFromCenter = Mathf.Abs(x - (width * 0.5f));
                 float alpha = distFromCenter <= maxW ? 1f : 0f;
-                // Add center bevel line highlight
-                Color pixelColor = color;
-                if (distFromCenter < 1.5f && alpha > 0.5f)
-                {
-                    pixelColor = Color.Lerp(color, Color.white, 0.35f);
-                }
-                pixels[y * width + x] = new Color(pixelColor.r, pixelColor.g, pixelColor.b, alpha);
+                pixels[y * width + x] = new Color(color.r, color.g, color.b, alpha);
             }
         }
 
@@ -591,7 +908,6 @@ public class TimeRewindController : MonoBehaviour
         for (int i = 0; i < sampleCount; i++)
         {
             float t = (float)i / sampleRate;
-            // Reverse envelope: soft rise, sharp snap at the end
             float env = Mathf.Pow((float)i / sampleCount, 3.5f);
             float ping = (Mathf.Sin(2f * Mathf.PI * 1600f * t) + Mathf.Sin(2f * Mathf.PI * 800f * t)) * 0.6f;
             float noise = ((float)UnityEngine.Random.value * 2f - 1f) * 0.35f;
@@ -614,7 +930,6 @@ public class TimeRewindController : MonoBehaviour
         {
             float t = (float)i / sampleRate;
             float progress = t / duration;
-            // Frequency sweeps upward indicating reverse time flow
             float freq = Mathf.Lerp(140f, 520f, progress);
             float mod = Mathf.Sin(2f * Mathf.PI * 9f * t) * 0.35f;
             float tone = Mathf.Sin(2f * Mathf.PI * (freq + mod * 40f) * t);
@@ -639,7 +954,6 @@ public class TimeRewindController : MonoBehaviour
         {
             float t = (float)i / sampleRate;
             float env = Mathf.Exp(-t * 4.2f);
-            // Harmonic bell chime (C5 + G5 + C6)
             float bell = Mathf.Sin(2f * Mathf.PI * 523.25f * t) * 0.5f +
                          Mathf.Sin(2f * Mathf.PI * 783.99f * t) * 0.3f +
                          Mathf.Sin(2f * Mathf.PI * 1046.50f * t) * 0.2f;
@@ -684,14 +998,6 @@ public class TimeRewindController : MonoBehaviour
 
     #region --- REWIND SEQUENCER & ANIMATION ---
 
-    /// <summary>
-    /// Executes the full time-rewind sequence requested by the player:
-    /// 1. Eye closing effect on screen
-    /// 2. Eye opens to reveal clock spinning backwards in time with audio
-    /// 3. Eye closes again
-    /// 4. Game state is restored + 5 seconds added
-    /// 5. Eye opens back to live game as if the fatal action never happened.
-    /// </summary>
     public void PlayTimeRewind(string educationalReason, float addedSeconds, Action onRewindStateRestore, Action onComplete)
     {
         PlayTimeRewind(educationalReason, addedSeconds, 1, 3, onRewindStateRestore, onComplete);
@@ -707,7 +1013,6 @@ public class TimeRewindController : MonoBehaviour
     {
         isRewinding = true;
 
-        // Ensure UI is enabled
         if (eyelidsRoot != null) eyelidsRoot.SetActive(true);
         if (clockRoot != null) clockRoot.SetActive(false);
 
@@ -720,29 +1025,57 @@ public class TimeRewindController : MonoBehaviour
         {
             elapsed += Time.unscaledDeltaTime;
             float t = Mathf.Clamp01(elapsed / eyeCloseDuration);
-            // Ease in: eyelid accelerates as it shuts
             float openAmount = 1f - Mathf.SmoothStep(0f, 1f, t);
             SetEyeOpenAmount(openAmount);
             yield return null;
         }
-        SetEyeOpenAmount(0f); // Fully closed/black
+        SetEyeOpenAmount(0f); // Screen is pitch black
 
-        yield return new WaitForSecondsRealtime(0.35f);
+        yield return new WaitForSecondsRealtime(0.25f);
 
         // -------------------------------------------------------------
-        // PHASE 2: Setup Clock & Eye Opens onto the Rewind Clock (0.5s)
+        // PHASE 2: Setup Clock UI Behind Closed Eyes
         // -------------------------------------------------------------
+        FormattedRewindReason formatted = FormatReason(reason);
+
         if (clockRoot != null)
         {
             clockRoot.SetActive(true);
-            if (headerText != null) headerText.text = "REWINDING TIME";
-            if (remainingLoopsText != null) remainingLoopsText.text = $"<color=#5CE1E6>TIME LOOPS REMAINING: {remainingLoops} / {maxLoops}</color>";
-            if (reasonText != null) reasonText.text = reason;
-            if (bonusBadgeText != null) bonusBadgeText.gameObject.SetActive(false);
+
+            if (categoryTagText != null)
+            {
+                categoryTagText.text = formatted.categoryTag;
+                categoryTagText.characterSpacing = 4f;
+                categoryTagText.color = formatted.tagColor;
+            }
+
+            if (primaryTitleText != null)
+            {
+                primaryTitleText.text = formatted.primaryTitle;
+                primaryTitleText.color = formatted.titleColor;
+            }
+
+            if (survivalRuleText != null)
+            {
+                survivalRuleText.text = $"\"{formatted.survivalRule}\"";
+            }
+
+            if (bonusBadgeText != null)
+            {
+                bonusBadgeText.gameObject.SetActive(false);
+                bonusBadgeText.text = $"<color=#00FFAA>+{addedSeconds:0}s ADDED TO TIMELINE</color>   <size=75%><color=#70D6FF>(LOOPS: {remainingLoops}/{maxLoops})</color></size>";
+            }
+
+            if (promptText != null)
+            {
+                promptText.text = "[ Press SPACE / E or Click to Continue ]";
+            }
+
             if (digitalClockText != null) digitalClockText.text = "00:00";
-            if (hourHand != null) hourHand.localEulerAngles = new Vector3(0, 0, -30f);
-            if (minuteHand != null) minuteHand.localEulerAngles = new Vector3(0, 0, 0f);
-            if (secondHand != null) secondHand.localEulerAngles = new Vector3(0, 0, 0f);
+
+            // Initial hand rotations
+            if (minuteHand != null) minuteHand.localEulerAngles = Vector3.zero;
+            if (hourHand != null) hourHand.localEulerAngles = Vector3.zero;
         }
 
         // Open eyelids to reveal clock
@@ -758,7 +1091,7 @@ public class TimeRewindController : MonoBehaviour
         SetEyeOpenAmount(1f); // Fully revealed
 
         // -------------------------------------------------------------
-        // PHASE 3: Clock Spinning Backwards with Audio & Animation (2.2s)
+        // PHASE 3: Clock Spinning Backwards with Audio & Vibration (2.4s)
         // -------------------------------------------------------------
         PlaySound(customRewindWhoosh, synthRewindWhoosh, 0.75f);
 
@@ -773,23 +1106,19 @@ public class TimeRewindController : MonoBehaviour
             tickTimer += dt;
 
             float progress = spinElapsed / rewindSpinDuration;
-
-            // Decelerate near the end (ease-out curve)
             float speedMult = progress > 0.75f ? Mathf.Lerp(1f, 0.05f, (progress - 0.75f) / 0.25f) : 1f;
 
             // Spin hands COUNTER-CLOCKWISE (Z rotation increases in Unity 2D)
-            float secSpin = 720f * speedMult * dt;
-            float minSpin = 360f * speedMult * dt;
+            float minSpin = 720f * speedMult * dt;
             float hourSpin = 60f * speedMult * dt;
 
-            if (secondHand != null) secondHand.Rotate(0f, 0f, secSpin);
             if (minuteHand != null) minuteHand.Rotate(0f, 0f, minSpin);
             if (hourHand != null) hourHand.Rotate(0f, 0f, hourSpin);
 
             // Clock pulse / time vortex breath
             if (clockPanel != null)
             {
-                float pulse = 1f + Mathf.Sin(spinElapsed * 14f) * 0.035f;
+                float pulse = 1f + Mathf.Sin(spinElapsed * 14f) * 0.025f;
                 clockPanel.localScale = new Vector3(pulse, pulse, 1f);
             }
 
@@ -808,7 +1137,7 @@ public class TimeRewindController : MonoBehaviour
             }
 
             // Digital clock display rolling backward
-            currentDisplaySeconds += dt * 15f;
+            currentDisplaySeconds += dt * (addedSeconds / rewindSpinDuration);
             int totalSec = Mathf.FloorToInt(currentDisplaySeconds);
             if (digitalClockText != null)
             {
@@ -824,11 +1153,15 @@ public class TimeRewindController : MonoBehaviour
         if (bonusBadgeText != null)
         {
             bonusBadgeText.gameObject.SetActive(true);
-            bonusBadgeText.text = $"<color=#FFD700>+{addedSeconds:0} SECONDS RESTORED</color>\n<size=55%><color=#D0D0D0>[Space / Click to Continue]</color></size>";
-            bonusBadgeText.transform.localScale = Vector3.one * 1.35f;
+            bonusBadgeText.transform.localScale = Vector3.one * 1.3f;
         }
 
-        // Hold clock & educational reason for comfortable reading before returning to live game
+        if (digitalClockText != null)
+        {
+            digitalClockText.text = $"<color=#00FFAA>+{addedSeconds:0}s RESTORED</color>";
+        }
+
+        // Hold clock & cause of death for comfortable reading before returning to live game
         float holdTimer = 0f;
         while (holdTimer < educationalReasonHoldDuration)
         {
@@ -838,7 +1171,7 @@ public class TimeRewindController : MonoBehaviour
                 bonusBadgeText.transform.localScale = Vector3.Lerp(bonusBadgeText.transform.localScale, Vector3.one, Time.unscaledDeltaTime * 6f);
             }
 
-            // Allow advancing if the player finished reading early (after at least 0.75s to avoid accidental clicks)
+            // Advance if player presses Space/E/Click (after at least 0.75s)
             if (holdTimer > 0.75f)
             {
                 if (Keyboard.current != null && (Keyboard.current.spaceKey.wasPressedThisFrame || Keyboard.current.eKey.wasPressedThisFrame))
@@ -872,7 +1205,7 @@ public class TimeRewindController : MonoBehaviour
         yield return new WaitForSecondsRealtime(0.25f);
 
         // -------------------------------------------------------------
-        // PHASE 5: Restore Game State Behind Closed Eyes (+5s & Undo Action)
+        // PHASE 5: Restore Game State Behind Closed Eyes (+15s / +5s & Undo Action)
         // -------------------------------------------------------------
         if (clockRoot != null)
         {
@@ -888,10 +1221,10 @@ public class TimeRewindController : MonoBehaviour
             Debug.LogError($"[TimeRewind] Error during state restore: {ex}");
         }
 
-        yield return null; // Wait 1 frame for physics, scene, and positions to settle
+        yield return null; // Wait 1 frame for physics and scene to settle
 
         // -------------------------------------------------------------
-        // PHASE 6: Eye Opens Back to the Live Game (0.7s)
+        // PHASE 6: Eye Opens Back to Live Gameplay (0.7s)
         // -------------------------------------------------------------
         elapsed = 0f;
         while (elapsed < eyeOpenDuration * 1.3f)
@@ -915,8 +1248,7 @@ public class TimeRewindController : MonoBehaviour
 
     /// <summary>
     /// Plays the intro rewind animation when starting from the start screen before Stage 1 begins:
-    /// Starts with eyes closed in darkness, opens onto the clock spinning backward in time,
-    /// displays the mission objective, closes eyes, and opens onto the live room.
+    /// Focuses sharply on "60 SECONDS BEFORE EARTHQUAKE — BE READY!"
     /// </summary>
     public void PlayIntroRewind(string introMessage, Action onComplete)
     {
@@ -928,7 +1260,6 @@ public class TimeRewindController : MonoBehaviour
     {
         isRewinding = true;
 
-        // Ensure UI is initialized and screen starts pitch black behind closed eyelids
         if (eyelidsRoot != null) eyelidsRoot.SetActive(true);
         if (clockRoot != null) clockRoot.SetActive(false);
         SetEyeOpenImmediate(0f); // Screen is pitch black
@@ -941,14 +1272,40 @@ public class TimeRewindController : MonoBehaviour
         if (clockRoot != null)
         {
             clockRoot.SetActive(true);
-            if (headerText != null) headerText.text = "REWINDING TIME";
-            if (remainingLoopsText != null) remainingLoopsText.text = "<color=#5CE1E6>TIME LOOPS REMAINING: 3 / 3</color>";
-            if (reasonText != null) reasonText.text = message;
-            if (bonusBadgeText != null) bonusBadgeText.gameObject.SetActive(false);
-            if (digitalClockText != null) digitalClockText.text = "00:00";
-            if (hourHand != null) hourHand.localEulerAngles = new Vector3(0, 0, -30f);
-            if (minuteHand != null) minuteHand.localEulerAngles = new Vector3(0, 0, 0f);
-            if (secondHand != null) secondHand.localEulerAngles = new Vector3(0, 0, 0f);
+
+            if (categoryTagText != null)
+            {
+                categoryTagText.text = "TIMELINE RESET";
+                categoryTagText.characterSpacing = 4f;
+                categoryTagText.color = new Color(0.35f, 0.85f, 1f, 1f);
+            }
+
+            if (primaryTitleText != null)
+            {
+                primaryTitleText.text = "<color=#FFDD00>60 SECONDS BEFORE EARTHQUAKE</color> — BE READY!";
+                primaryTitleText.color = Color.white;
+            }
+
+            if (survivalRuleText != null)
+            {
+                survivalRuleText.text = "\"Secure loose hazards & pack emergency supplies before the tremor!\"";
+            }
+
+            if (bonusBadgeText != null)
+            {
+                bonusBadgeText.gameObject.SetActive(false);
+                bonusBadgeText.text = "<color=#00FFAA>TIMELINE SYNCHRONIZED — 60 SECONDS</color>";
+            }
+
+            if (promptText != null)
+            {
+                promptText.text = "[ Press SPACE / E or Click to Begin ]";
+            }
+
+            if (digitalClockText != null) digitalClockText.text = "01:00";
+
+            if (minuteHand != null) minuteHand.localEulerAngles = Vector3.zero;
+            if (hourHand != null) hourHand.localEulerAngles = Vector3.zero;
         }
 
         // Open eyelids to reveal clock
@@ -961,7 +1318,7 @@ public class TimeRewindController : MonoBehaviour
             SetEyeOpenAmount(openAmount);
             yield return null;
         }
-        SetEyeOpenAmount(1f); // Fully revealed
+        SetEyeOpenAmount(1f);
 
         // -------------------------------------------------------------
         // PHASE 2: Clock Spinning Backwards with Audio (2.4s)
@@ -981,17 +1338,15 @@ public class TimeRewindController : MonoBehaviour
             float progress = spinElapsed / rewindSpinDuration;
             float speedMult = progress > 0.75f ? Mathf.Lerp(1f, 0.05f, (progress - 0.75f) / 0.25f) : 1f;
 
-            float secSpin = 720f * speedMult * dt;
-            float minSpin = 360f * speedMult * dt;
+            float minSpin = 720f * speedMult * dt;
             float hourSpin = 60f * speedMult * dt;
 
-            if (secondHand != null) secondHand.Rotate(0f, 0f, secSpin);
             if (minuteHand != null) minuteHand.Rotate(0f, 0f, minSpin);
             if (hourHand != null) hourHand.Rotate(0f, 0f, hourSpin);
 
             if (clockPanel != null)
             {
-                float pulse = 1f + Mathf.Sin(spinElapsed * 14f) * 0.035f;
+                float pulse = 1f + Mathf.Sin(spinElapsed * 14f) * 0.025f;
                 clockPanel.localScale = new Vector3(pulse, pulse, 1f);
             }
 
@@ -1008,7 +1363,7 @@ public class TimeRewindController : MonoBehaviour
                 PlaySound(customReverseTick, synthReverseTick, 0.5f);
             }
 
-            currentDisplaySeconds += dt * 15f;
+            currentDisplaySeconds += dt * (60f / rewindSpinDuration);
             int totalSec = Mathf.FloorToInt(currentDisplaySeconds);
             if (digitalClockText != null)
             {
@@ -1024,8 +1379,12 @@ public class TimeRewindController : MonoBehaviour
         if (bonusBadgeText != null)
         {
             bonusBadgeText.gameObject.SetActive(true);
-            bonusBadgeText.text = "<color=#FFD700>60 SECONDS UNTIL THE EARTHQUAKE</color>\n<size=55%><color=#D0D0D0>[Space / Click to Start]</color></size>";
-            bonusBadgeText.transform.localScale = Vector3.one * 1.35f;
+            bonusBadgeText.transform.localScale = Vector3.one * 1.3f;
+        }
+
+        if (digitalClockText != null)
+        {
+            digitalClockText.text = "<color=#00FFAA>01:00 PREPARATION</color>";
         }
 
         // Hold clock for comfortable reading
@@ -1078,7 +1437,7 @@ public class TimeRewindController : MonoBehaviour
         yield return null;
 
         // -------------------------------------------------------------
-        // PHASE 4: Eye Opens Back to the Live Game (0.7s)
+        // PHASE 4: Eye Opens Back to Live Game (0.7s)
         // -------------------------------------------------------------
         elapsed = 0f;
         while (elapsed < eyeOpenDuration * 1.3f)
@@ -1089,7 +1448,7 @@ public class TimeRewindController : MonoBehaviour
             SetEyeOpenAmount(openAmount);
             yield return null;
         }
-        SetEyeOpenAmount(1f); // Fully open
+        SetEyeOpenAmount(1f);
 
         if (eyelidsRoot != null)
         {
@@ -1105,9 +1464,7 @@ public class TimeRewindController : MonoBehaviour
     }
 
     /// <summary>
-    /// Executes the Game Over sequence when all 3 time loop rewinds have been exhausted.
-    /// Displays timeline collapsed with cracked/frozen clock, educational reason,
-    /// and waits for player to restart run.
+    /// Executes the Game Over sequence when all time loop rewinds have been exhausted.
     /// </summary>
     public void PlayGameOverSequence(string educationalReason, Action onRestart)
     {
@@ -1135,21 +1492,49 @@ public class TimeRewindController : MonoBehaviour
         }
         SetEyeOpenAmount(0f);
 
-        yield return new WaitForSecondsRealtime(0.4f);
+        yield return new WaitForSecondsRealtime(0.3f);
 
-        // PHASE 2: Eye opens onto frozen / collapsed clock with red warning
+        FormattedRewindReason formatted = FormatReason(reason);
+
+        // PHASE 2: Eye opens onto frozen clock with red warning
         if (clockRoot != null)
         {
             clockRoot.SetActive(true);
-            if (headerText != null) headerText.text = "<color=#FF3333>TIMELINE COLLAPSED</color>";
-            if (remainingLoopsText != null) remainingLoopsText.text = "<color=#FF6666>OUT OF TIME LOOPS (0/3)</color>";
-            if (reasonText != null) reasonText.text = reason;
-            if (digitalClockText != null) digitalClockText.text = "<color=#FF4444>00:00</color>";
+
+            if (categoryTagText != null)
+            {
+                categoryTagText.text = "TIMELINE COLLAPSED";
+                categoryTagText.characterSpacing = 4f;
+                categoryTagText.color = new Color(1f, 0.2f, 0.2f, 1f);
+            }
+
+            if (primaryTitleText != null)
+            {
+                primaryTitleText.text = "<color=#FF4444>ALL TIME LOOPS EXHAUSTED (0/3)</color>";
+                primaryTitleText.color = Color.white;
+            }
+
+            if (survivalRuleText != null)
+            {
+                survivalRuleText.text = $"CAUSE: {formatted.primaryTitle} — {formatted.survivalRule}";
+            }
+
             if (bonusBadgeText != null)
             {
                 bonusBadgeText.gameObject.SetActive(true);
                 bonusBadgeText.text = "<color=#FFD700>PRESS [R] OR CLICK TO RESTART RUN</color>";
             }
+
+            if (promptText != null)
+            {
+                promptText.text = "[ Game Over — Run Terminated ]";
+            }
+
+            if (digitalClockText != null)
+            {
+                digitalClockText.text = "<color=#FF4444>00:00</color>";
+            }
+
             if (clockAura != null)
             {
                 clockAura.color = new Color(0.9f, 0.15f, 0.15f, 0.45f);
@@ -1195,7 +1580,6 @@ public class TimeRewindController : MonoBehaviour
 
         yield return new WaitForSecondsRealtime(0.2f);
 
-        // Reset game to checkpoint
         try
         {
             onRestart?.Invoke();
@@ -1232,23 +1616,18 @@ public class TimeRewindController : MonoBehaviour
 
         if (topEyelid != null)
         {
-            // At amount = 1 (open): topY = 650 (pulled completely above screen)
-            // At amount = 0 (closed): topY = -150 (descends well past the center line!)
             float topY = Mathf.Lerp(-150f, 650f, amount);
             topEyelid.anchoredPosition = new Vector2(0f, topY);
         }
 
         if (bottomEyelid != null)
         {
-            // At amount = 1 (open): bottomY = -650 (pulled completely below screen)
-            // At amount = 0 (closed): bottomY = +150 (ascends well past the center line!)
             float bottomY = Mathf.Lerp(150f, -650f, amount);
             bottomEyelid.anchoredPosition = new Vector2(0f, bottomY);
         }
 
         if (fullBlackOverlay != null)
         {
-            // Fades into 100% solid pitch black; at <= 0.05 it is guaranteed pure solid black (#000000)
             float blackAlpha = amount <= 0.05f ? 1f : Mathf.Clamp01((1f - amount) * 1.5f);
             fullBlackOverlay.color = new Color(0f, 0f, 0f, blackAlpha);
         }
@@ -1277,10 +1656,21 @@ public class TimeRewindController : MonoBehaviour
     private void TestRewind()
     {
         PlayTimeRewind(
-            educationalReason: "TEST REWIND: Electric spark caused gas ignition! Time rewound by 5 seconds.",
-            addedSeconds: 5f,
-            onRewindStateRestore: () => Debug.Log("<color=cyan>[TimeRewind] Restored state with +5s!</color>"),
+            educationalReason: "FATAL EXPLOSION: The electrical light switch sparked and ignited the leaking gas! NEVER flip light switches or create electrical sparks when you smell gas!",
+            addedSeconds: 15f,
+            remainingLoops: 2,
+            maxLoops: 3,
+            onRewindStateRestore: () => Debug.Log("<color=cyan>[TimeRewind] Restored state with +15s!</color>"),
             onComplete: () => Debug.Log("<color=green>[TimeRewind] Sequence finished!</color>")
+        );
+    }
+
+    [ContextMenu("Test Intro Rewind In Editor")]
+    private void TestIntroRewind()
+    {
+        PlayIntroRewind(
+            introMessage: "60 SECONDS BEFORE EARTHQUAKE — BE READY!",
+            onComplete: () => Debug.Log("<color=green>[TimeRewind] Intro finished!</color>")
         );
     }
 

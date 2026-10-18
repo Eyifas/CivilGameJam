@@ -104,7 +104,7 @@ public class GameTimelineManager : MonoBehaviour
     [Tooltip("If true, plays the time rewind clock animation when entering the game before Stage 1 starts")]
     [SerializeField] private bool playIntroRewind = true;
     [TextArea(2, 4)]
-    [SerializeField] private string introRewindMessage = "A second chance... You have 60 seconds before the earthquake strikes! Secure loose hazards and pack emergency supplies!";
+    [SerializeField] private string introRewindMessage = "60 SECONDS BEFORE EARTHQUAKE — BE READY!\nSecure loose hazards & pack emergency supplies!";
 
     [Header("System References")]
     [SerializeField] private RoomCamera roomCamera;
