@@ -126,6 +126,7 @@ public class ReturnToRoom : MonoBehaviour
         if (CupboardSceneController.Instance != null && CupboardSceneController.Instance.IsBusy) return;
         if (TableSceneController.Instance != null && TableSceneController.Instance.IsBusy) return;
         if (PipeSceneController.Instance != null && PipeSceneController.Instance.IsBusy) return;
+        if (DoorSceneController.Instance != null && DoorSceneController.Instance.IsBusy) return;
         if (QTEManager.Instance != null && QTEManager.Instance.IsAnyQTEActive) return;
         if (BookshelfSceneController.Instance != null && BookshelfSceneController.Instance.IsQTERunning) return;
 
@@ -176,6 +177,7 @@ public class ReturnToRoom : MonoBehaviour
         if (CupboardSceneController.Instance != null && CupboardSceneController.Instance.IsBusy) return;
         if (TableSceneController.Instance != null && TableSceneController.Instance.IsBusy) return;
         if (PipeSceneController.Instance != null && PipeSceneController.Instance.IsBusy) return;
+        if (DoorSceneController.Instance != null && DoorSceneController.Instance.IsBusy) return;
 
         EnsureStyles();
 

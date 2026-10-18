@@ -29,6 +29,7 @@ public class PersistentCanvas : MonoBehaviour
         DontDestroyOnLoad(gameObject);
 
         CleanupDuplicateEventSystems();
+        TodoListUI.EnsureTodoListUI();
     }
 
     private void OnEnable()
@@ -44,6 +45,7 @@ public class PersistentCanvas : MonoBehaviour
     private void HandleSceneLoaded(Scene scene, LoadSceneMode mode)
     {
         CleanupDuplicateEventSystems();
+        TodoListUI.EnsureTodoListUI();
     }
 
     private void CleanupDuplicateEventSystems()

@@ -15,6 +15,7 @@ public class InventoryUI : MonoBehaviour
     [SerializeField] private Sprite vidaSprite;
     [SerializeField] private Sprite flashlightSprite;
     [SerializeField] private Sprite firstAidKitSprite;
+    [SerializeField] private Sprite keySprite;
 
     private int draggedSlotIndex = -1;
     private string draggedItemName = null;
@@ -24,6 +25,7 @@ public class InventoryUI : MonoBehaviour
     private void Awake()
     {
         EnsureValidFlashlightSprite();
+        EnsureValidKeySprite();
         ConfigureHotbarLayout();
         SetupSlotDraggers();
     }
@@ -207,6 +209,33 @@ public class InventoryUI : MonoBehaviour
                     if (accepted)
                     {
                         // Item dropped onto the bookshelf: it disappears from the inventory!
+                        InventoryManager.RemoveItem(itemName);
+                        UpdateInventoryUI();
+                        return;
+                    }
+                }
+            }
+        }
+
+        // 3. Door: Key insertion
+        var doorCtrl = DoorSceneController.Instance != null 
+            ? DoorSceneController.Instance 
+            : Object.FindFirstObjectByType<DoorSceneController>();
+
+        if (doorCtrl != null)
+        {
+            Camera cam = Camera.main != null ? Camera.main : Object.FindFirstObjectByType<Camera>();
+            if (cam != null)
+            {
+                Vector3 worldPos = cam.ScreenToWorldPoint(new Vector3(screenPos.x, screenPos.y, -cam.transform.position.z));
+                worldPos.z = 0f;
+
+                if (doorCtrl.IsInsideDropZone(worldPos))
+                {
+                    bool accepted = doorCtrl.TryDropKeyFromInventory(itemName, worldPos);
+                    if (accepted)
+                    {
+                        // Key inserted into door lock: disappears from inventory!
                         InventoryManager.RemoveItem(itemName);
                         UpdateInventoryUI();
                         return;
@@ -495,6 +524,91 @@ public class InventoryUI : MonoBehaviour
         return null;
     }
 
+    private void EnsureValidKeySprite()
+    {
+        if (keySprite == null)
+        {
+            keySprite = GetKeySprite();
+        }
+    }
+
+    private static Sprite s_keySprite;
+    public static Sprite GetKeySprite()
+    {
+        if (s_keySprite != null) return s_keySprite;
+
+        // 1. Try Resources.Load
+        s_keySprite = Resources.Load<Sprite>("Anahtar") ??
+                      Resources.Load<Sprite>("Key") ??
+                      Resources.Load<Sprite>("anahtar1");
+        if (s_keySprite != null) return s_keySprite;
+
+        var allRes = Resources.LoadAll<Sprite>("Anahtar");
+        if (allRes != null && allRes.Length > 0 && allRes[0] != null)
+        {
+            s_keySprite = allRes[0];
+            return s_keySprite;
+        }
+
+#if UNITY_EDITOR
+        // 2. Try AssetDatabase in Editor
+        string[] paths = new[]
+        {
+            "Assets/MainScene/Sprite/anahtar1.png",
+            "Assets/Resources/Anahtar.png",
+            "Assets/Resources/Key.png"
+        };
+        foreach (var p in paths)
+        {
+            var s = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>(p);
+            if (s != null)
+            {
+                s_keySprite = s;
+                return s_keySprite;
+            }
+            var allS = UnityEditor.AssetDatabase.LoadAllAssetsAtPath(p);
+            if (allS != null)
+            {
+                foreach (var a in allS)
+                {
+                    if (a is Sprite spr)
+                    {
+                        s_keySprite = spr;
+                        return s_keySprite;
+                    }
+                }
+            }
+        }
+#endif
+
+        // 3. Fallback: load directly from disk bytes
+        string diskPath = System.IO.Path.Combine(Application.dataPath, "MainScene/Sprite/anahtar1.png");
+        if (!System.IO.File.Exists(diskPath))
+        {
+            diskPath = System.IO.Path.Combine(Application.dataPath, "Resources/Anahtar.png");
+        }
+        if (System.IO.File.Exists(diskPath))
+        {
+            try
+            {
+                byte[] data = System.IO.File.ReadAllBytes(diskPath);
+                Texture2D tex = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+                tex.filterMode = FilterMode.Point;
+                if (tex.LoadImage(data))
+                {
+                    Rect rect = (tex.width == 128 && tex.height == 128)
+                        ? new Rect(30, 11, 94, 88)
+                        : new Rect(0, 0, tex.width, tex.height);
+                    s_keySprite = Sprite.Create(tex, rect, new Vector2(0.5f, 0.5f), 100f);
+                    return s_keySprite;
+                }
+            }
+            catch { }
+        }
+
+        return null;
+    }
+
     private Sprite GetItemSprite(string itemName)
     {
         switch (itemName)
@@ -521,6 +635,13 @@ public class InventoryUI : MonoBehaviour
             case "First-Aid Kit":
             case "First Aid Kit":
                 return firstAidKitSprite;
+
+            case "Anahtar":
+            case "Key":
+            case "anahtar1":
+            case "DrawerKey":
+                if (keySprite != null) return keySprite;
+                return GetKeySprite();
 
             default:
                 return null;
