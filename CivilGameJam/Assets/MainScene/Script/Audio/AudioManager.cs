@@ -68,6 +68,22 @@ public class AudioManager : MonoBehaviour
     [Range(0f, 1f)] [SerializeField] private float ambientVolume = 0.8f;
     [Range(0f, 1f)] [SerializeField] private float uiVolume = 0.85f;
 
+    [Header("Optional Custom Audio Overrides (Inspector)")]
+    [Tooltip("Drag custom AudioClips here in the Inspector if desired.")]
+    [SerializeField] private AudioClip customMenuBgm;
+    [SerializeField] private AudioClip customStage1Bgm;
+    [SerializeField] private AudioClip customEarthquakeBgm;
+    [SerializeField] private AudioClip customStage3Bgm;
+    [SerializeField] private AudioClip customVictoryBgm;
+    [SerializeField] private AudioClip customFootstep;
+    [SerializeField] private AudioClip customExplosion;
+    [SerializeField] private AudioClip customHammer;
+    [SerializeField] private AudioClip customDoor;
+
+    [Header("BGM Track Speed Multipliers")]
+    [Tooltip("Playback speed multiplier for MinigameTension (speedup by 2 = 2.0f)")]
+    [SerializeField] private float minigameTensionSpeed = 1.3f;
+
     [Header("BGM Channels (Crossfade)")]
     private AudioSource bgmSourceA;
     private AudioSource bgmSourceB;
@@ -325,9 +341,9 @@ public class AudioManager : MonoBehaviour
 
     #region --- Public Static Audio API ---
 
-    public static void PlayBGM(BgmTrack track, float fadeDuration = 0.5f)
+    public static void PlayBGM(BgmTrack track, float fadeDuration = 0.5f, float pitch = -1f)
     {
-        if (Instance != null) Instance.InternalPlayBGM(track, fadeDuration);
+        if (Instance != null) Instance.InternalPlayBGM(track, fadeDuration, pitch);
     }
 
     public static void StopBGM(float fadeDuration = 0.5f)
@@ -491,11 +507,85 @@ public class AudioManager : MonoBehaviour
         if (Instance != null) Instance.InternalSetEarthquakeRumble(active, targetVolume);
     }
 
+    /// <summary>
+    /// Play any custom AudioClip once on the SFX channel.
+    /// </summary>
+    public static void PlayClip(AudioClip clip, float volume = 1.0f, float pitch = 1.0f)
+    {
+        if (Instance != null && clip != null && Instance.sfxSource != null)
+        {
+            Instance.sfxSource.pitch = pitch;
+            Instance.sfxSource.PlayOneShot(clip, Instance.sfxVolume * Instance.masterVolume * volume);
+        }
+    }
+
+    /// <summary>
+    /// Play an audio file from Resources by name or subpath (e.g. "Audio/SFX/MySound" or "MySound").
+    /// </summary>
+    public static void PlaySound(string resourcePath, float volume = 1.0f, float pitch = 1.0f)
+    {
+        if (Instance == null || string.IsNullOrEmpty(resourcePath)) return;
+        AudioClip clip = Resources.Load<AudioClip>(resourcePath) ??
+                         Resources.Load<AudioClip>("Audio/SFX/" + resourcePath) ??
+                         Resources.Load<AudioClip>("Audio/BGM/" + resourcePath) ??
+                         Resources.Load<AudioClip>("Audio/" + resourcePath);
+        if (clip != null)
+        {
+            PlayClip(clip, volume, pitch);
+        }
+        else
+        {
+            Debug.LogWarning($"[AudioManager] Could not find AudioClip in Resources at: '{resourcePath}'");
+        }
+    }
+
+    /// <summary>
+    /// Override a specific SFX type with a custom AudioClip at runtime.
+    /// </summary>
+    public static void SetCustomSFX(SFXType type, AudioClip clip)
+    {
+        if (Instance != null && clip != null)
+        {
+            Instance.sfxClips[type] = clip;
+        }
+    }
+
+    /// <summary>
+    /// Override a specific BGM track with a custom AudioClip at runtime.
+    /// </summary>
+    public static void SetCustomBGM(BgmTrack track, AudioClip clip)
+    {
+        if (Instance != null && clip != null)
+        {
+            Instance.bgmClips[track] = clip;
+        }
+    }
+
+    /// <summary>
+    /// Playback speed multiplier for MinigameTension (default 2.0f).
+    /// </summary>
+    public static float MinigameTensionSpeed
+    {
+        get => Instance != null ? Instance.minigameTensionSpeed : 2.0f;
+        set
+        {
+            if (Instance != null)
+            {
+                Instance.minigameTensionSpeed = value;
+                if (Instance.currentBgmTrack == BgmTrack.MinigameTension)
+                {
+                    AudioSource activeSource = Instance.isBgmSourceAActive ? Instance.bgmSourceA : Instance.bgmSourceB;
+                    if (activeSource != null) activeSource.pitch = value;
+                }
+            }
+        }
+    }
+
     #endregion
 
     #region --- Internal Playback Implementations ---
 
-    private void InternalPlayBGM(BgmTrack track, float fadeDuration)
+    private void InternalPlayBGM(BgmTrack track, float fadeDuration, float pitch = -1f)
     {
         if (track == currentBgmTrack && (bgmSourceA.isPlaying || bgmSourceB.isPlaying))
         {
@@ -512,7 +602,7 @@ public class AudioManager : MonoBehaviour
 
         if (!bgmClips.TryGetValue(track, out AudioClip clip) || clip == null)
         {
-            clip = SynthesizeBgmClip(track);
+            clip = TryLoadCustomClip("BGM", track.ToString()) ?? SynthesizeBgmClip(track);
             if (clip != null) bgmClips[track] = clip;
         }
 
@@ -523,7 +613,8 @@ public class AudioManager : MonoBehaviour
             StopCoroutine(bgmCrossfadeCoroutine);
         }
 
-        bgmCrossfadeCoroutine = StartCoroutine(CrossfadeBgmRoutine(clip, fadeDuration));
+        float targetPitch = pitch > 0f ? pitch : ((track == BgmTrack.MinigameTension) ? minigameTensionSpeed : 1.0f);
+        bgmCrossfadeCoroutine = StartCoroutine(CrossfadeBgmRoutine(clip, fadeDuration, targetPitch));
     }
 
     private void InternalStopBGM(float fadeDuration)
@@ -533,13 +624,14 @@ public class AudioManager : MonoBehaviour
         bgmCrossfadeCoroutine = StartCoroutine(FadeOutBgmRoutine(fadeDuration));
     }
 
-    private IEnumerator CrossfadeBgmRoutine(AudioClip newClip, float duration)
+    private IEnumerator CrossfadeBgmRoutine(AudioClip newClip, float duration, float pitch = 1.0f)
     {
         AudioSource incoming = isBgmSourceAActive ? bgmSourceB : bgmSourceA;
         AudioSource outgoing = isBgmSourceAActive ? bgmSourceA : bgmSourceB;
         isBgmSourceAActive = !isBgmSourceAActive;
 
         incoming.clip = newClip;
+        incoming.pitch = pitch;
         incoming.volume = 0f;
         incoming.Play();
 
@@ -553,6 +645,7 @@ public class AudioManager : MonoBehaviour
             incoming.volume = targetVol;
             outgoing.volume = 0f;
             outgoing.Stop();
+            outgoing.pitch = 1.0f;
             yield break;
         }
 
@@ -570,6 +663,7 @@ public class AudioManager : MonoBehaviour
         incoming.volume = targetVol;
         outgoing.volume = 0f;
         outgoing.Stop();
+        outgoing.pitch = 1.0f;
     }
 
     private IEnumerator FadeOutBgmRoutine(float duration)
@@ -593,6 +687,8 @@ public class AudioManager : MonoBehaviour
         bgmSourceB.volume = 0f;
         bgmSourceA.Stop();
         bgmSourceB.Stop();
+        bgmSourceA.pitch = 1.0f;
+        bgmSourceB.pitch = 1.0f;
     }
 
     private void InternalPlaySFX(SFXType type, float volumeMultiplier = 1.0f, float pitch = 1.0f, AudioSource targetSource = null)
@@ -601,7 +697,7 @@ public class AudioManager : MonoBehaviour
 
         if (!sfxClips.TryGetValue(type, out AudioClip clip) || clip == null)
         {
-            clip = SynthesizeSfxClip(type);
+            clip = TryLoadCustomClip("SFX", type.ToString()) ?? SynthesizeSfxClip(type);
             if (clip != null) sfxClips[type] = clip;
         }
 
@@ -707,21 +803,75 @@ public class AudioManager : MonoBehaviour
 
     #region --- Procedural Sound Synthesis Engine ---
 
+    private static AudioClip TryLoadCustomClip(string subfolder, string clipName)
+    {
+        if (string.IsNullOrEmpty(clipName)) return null;
+
+        string[] candidates = new string[]
+        {
+            $"Audio/{subfolder}/{clipName}",
+            $"Audio/{clipName}",
+            $"{subfolder}/{clipName}",
+            clipName
+        };
+
+        foreach (var path in candidates)
+        {
+            var loaded = Resources.Load<AudioClip>(path);
+            if (loaded != null) return loaded;
+        }
+
+        return null;
+    }
+
     private void PreloadProceduralClips()
     {
-        // Pre-generate common clips on start to eliminate runtime stutter
+        // 1. Inspector Overrides (if assigned on AudioManager component)
+        if (customMenuBgm != null) bgmClips[BgmTrack.Menu] = customMenuBgm;
+        if (customStage1Bgm != null) bgmClips[BgmTrack.Stage1_Preparation] = customStage1Bgm;
+        if (customEarthquakeBgm != null) bgmClips[BgmTrack.Earthquake] = customEarthquakeBgm;
+        if (customStage3Bgm != null) bgmClips[BgmTrack.Stage3_PostQuake] = customStage3Bgm;
+        if (customVictoryBgm != null) bgmClips[BgmTrack.VictoryOutro] = customVictoryBgm;
+
+        if (customFootstep != null) { footstepClipL = customFootstep; footstepClipR = customFootstep; }
+        if (customExplosion != null) sfxClips[SFXType.Explosion] = customExplosion;
+        if (customHammer != null) sfxClips[SFXType.HammerHit] = customHammer;
+        if (customDoor != null) sfxClips[SFXType.DoorOpen] = customDoor;
+
+        // 2. Pre-generate or load custom clips for SFX
         foreach (SFXType type in (SFXType[])Enum.GetValues(typeof(SFXType)))
         {
             if (type == SFXType.None) continue;
-            var clip = SynthesizeSfxClip(type);
+            if (sfxClips.ContainsKey(type) && sfxClips[type] != null) continue;
+
+            string sfxName = type.ToString();
+            AudioClip clip = TryLoadCustomClip("SFX", sfxName) ?? SynthesizeSfxClip(type);
             if (clip != null) sfxClips[type] = clip;
         }
 
+        // 3. Pre-generate or load custom clips for BGM
         foreach (BgmTrack track in (BgmTrack[])Enum.GetValues(typeof(BgmTrack)))
         {
             if (track == BgmTrack.None) continue;
-            var clip = SynthesizeBgmClip(track);
+            if (bgmClips.ContainsKey(track) && bgmClips[track] != null) continue;
+
+            string bgmName = track.ToString();
+            AudioClip clip = TryLoadCustomClip("BGM", bgmName) ?? SynthesizeBgmClip(track);
             if (clip != null) bgmClips[track] = clip;
+        }
+
+        // Footstep custom stereo check
+        if (footstepClipL == null)
+        {
+            footstepClipL = TryLoadCustomClip("SFX", "Footstep_L") ??
+                            TryLoadCustomClip("SFX", "Footstep1") ??
+                            TryLoadCustomClip("SFX", "Footstep");
+        }
+        if (footstepClipR == null)
+        {
+            footstepClipR = TryLoadCustomClip("SFX", "Footstep_R") ??
+                            TryLoadCustomClip("SFX", "Footstep2") ??
+                            footstepClipL;
         }
     }
 

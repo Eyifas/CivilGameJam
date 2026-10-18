@@ -31,6 +31,7 @@ public struct TimelineSnapshot
     public bool isPaintingRemoved;
     public bool isCandleExtinguished;
     public bool hasFlashlight;
+    public bool isFlashlightEquipped;
     public bool hasFirstAidKit;
     public List<string> inventoryItems;
 
@@ -354,6 +355,7 @@ public class GameTimelineManager : MonoBehaviour
             isPaintingRemoved = isPaintingRemoved,
             isCandleExtinguished = isCandleExtinguished,
             hasFlashlight = hasFlashlight,
+            isFlashlightEquipped = PlayerMovement.IsFlashlightEquipped,
             hasFirstAidKit = hasFirstAidKit,
             inventoryItems = InventoryManager.GetItemsCopy(),
 
@@ -706,9 +708,9 @@ public class GameTimelineManager : MonoBehaviour
         }
         else if (action == "ShutOffValves")
         {
-            if (!hasFlashlight)
+            if (!hasFlashlight || !PlayerMovement.IsFlashlightEquipped)
             {
-                TriggerRewind("IN THE DARK: You couldn't locate the gas valve in total darkness and tripped over broken fixtures! A packed flashlight is essential for utility shut-off!");
+                TriggerRewind("IN THE DARK: You couldn't locate the gas valve in total darkness! Drag the flashlight from your inventory into the scene to illuminate the room!");
                 return;
             }
 
@@ -739,33 +741,33 @@ public class GameTimelineManager : MonoBehaviour
 
     public void HandleStairwellPlanterHazard()
     {
-        if (hasFlashlight)
+        if (hasFlashlight && PlayerMovement.IsFlashlightEquipped)
         {
             isPlanterMoved = true;
             Debug.Log("<color=green>[Timeline] Flashlight illuminated fallen planter! Moved aside safely.</color>");
         }
         else
         {
-            TriggerRewind("INJURY: In total darkness without a flashlight, you tripped over the heavy planter and fell down the stairs!");
+            TriggerRewind("INJURY: In total darkness without your flashlight equipped, you tripped over the heavy planter and fell down the stairs!");
         }
     }
 
     public void HandleNeighborTriage()
     {
-        if (hasFlashlight && hasFirstAidKit)
+        if (hasFlashlight && PlayerMovement.IsFlashlightEquipped && hasFirstAidKit)
         {
             isNeighborTreated = true;
             Debug.Log("<color=green>[Timeline] Applied pressure bandage with First-Aid Kit! Mr. Ahmet stabilized!</color>");
             AdvanceToStage5();
         }
-        else if (hasFlashlight && !hasFirstAidKit)
+        else if (hasFlashlight && PlayerMovement.IsFlashlightEquipped && !hasFirstAidKit)
         {
             Debug.LogWarning("[Timeline] Tragic Outcome: Left the First-Aid Kit behind. Mr. Ahmet bled out on the sidewalk.");
             AdvanceToStage5();
         }
         else
         {
-            TriggerRewind("BLIND SEARCH: Without a flashlight, you couldn't locate or treat Mr. Ahmet in the dark corridor.");
+            TriggerRewind("BLIND SEARCH: Without your flashlight turned on, you couldn't locate or treat Mr. Ahmet in the dark corridor.");
         }
     }
 
@@ -1038,6 +1040,7 @@ public class GameTimelineManager : MonoBehaviour
         isPaintingRemoved = snapshot.isPaintingRemoved;
         isCandleExtinguished = snapshot.isCandleExtinguished;
         hasFlashlight = snapshot.hasFlashlight;
+        PlayerMovement.SetFlashlightEquipped(snapshot.isFlashlightEquipped);
         hasFirstAidKit = snapshot.hasFirstAidKit;
 
         isCabinetSecured = snapshot.isCabinetSecured;
@@ -1268,6 +1271,7 @@ public class GameTimelineManager : MonoBehaviour
         InventorySelection.ResetSelection();
         InventoryManager.ResetInventory();
         PlayerMovement.ClearSavedPosition();
+        PlayerMovement.SetFlashlightEquipped(false);
         SwitchInteraction.ResetAllHazardStates();
 
         Time.timeScale = 1f;

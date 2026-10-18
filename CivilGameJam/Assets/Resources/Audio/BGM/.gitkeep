@@ -1,0 +1,10 @@
+# Place custom background music files (.mp3, .wav, .ogg) in this folder.
+# Supported names:
+# Menu
+# Stage1_Preparation
+# Earthquake
+# Stage3_PostQuake
+# MinigameFocus
+# MinigameTension
+# VictoryOutro
+# VictoryLoop

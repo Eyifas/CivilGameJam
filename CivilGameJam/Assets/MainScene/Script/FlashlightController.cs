@@ -20,8 +20,9 @@ public class FlashlightController : MonoBehaviour
             return;
         }
 
-        bool hasFlashlight = InventoryManager.HasItem("Flashlight") ||
-            (GameTimelineManager.Instance != null && GameTimelineManager.Instance.HasFlashlight);
+        bool hasFlashlight = (InventoryManager.HasItem("Flashlight") || InventoryManager.HasItem("fener") ||
+            (GameTimelineManager.Instance != null && GameTimelineManager.Instance.HasFlashlight)) &&
+            PlayerMovement.IsFlashlightEquipped;
 
         bool isStage3 = GameTimelineManager.Instance != null &&
             (GameTimelineManager.Instance.CurrentStage == GameStage.Stage3_Utilities ||

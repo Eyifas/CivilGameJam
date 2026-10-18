@@ -152,12 +152,37 @@ public class InventoryUI : MonoBehaviour
         draggedItemName = null;
         draggedSlotIndex = -1;
 
-        HandleItemDrop(itemToDrop, screenPos);
+        HandleItemDrop(itemToDrop, slotIndex, screenPos);
     }
 
-    private void HandleItemDrop(string itemName, Vector2 screenPos)
+    private void HandleItemDrop(string itemName, int slotIndex, Vector2 screenPos)
     {
-        // Check if BookshelfSceneController is present in the active scene
+        // 1. Flashlight: When dragged into the scene, equip it under character's armpit and turn it on!
+        if (IsFlashlightItem(itemName))
+        {
+            bool droppedInScene = true;
+            if (slotIndex >= 0 && slotIndex < itemIcons.Length && itemIcons[slotIndex] != null)
+            {
+                RectTransform slotRect = itemIcons[slotIndex].rectTransform;
+                if (slotRect != null && RectTransformUtility.RectangleContainsScreenPoint(slotRect, screenPos))
+                {
+                    droppedInScene = false;
+                }
+            }
+
+            if (droppedInScene)
+            {
+                PlayerMovement.SetFlashlightEquipped(true);
+                AudioManager.PlayFlashlightToggle(true);
+                Debug.Log("<color=yellow>[Flashlight] Flashlight dragged into scene! Equipped in hand.</color>");
+            }
+
+            // As explicitly requested by the user: Flashlight DOES NOT disappear when dragged into the scene!
+            UpdateInventoryUI();
+            return;
+        }
+
+        // 2. Bookshelf: Anchoring items
         var bookshelfCtrl = BookshelfSceneController.Instance != null 
             ? BookshelfSceneController.Instance 
             : Object.FindFirstObjectByType<BookshelfSceneController>();
@@ -186,6 +211,14 @@ public class InventoryUI : MonoBehaviour
 
         // Outside valid drop zone or rejected: slot will restore automatically on UpdateInventoryUI
         UpdateInventoryUI();
+    }
+
+    public static bool IsFlashlightItem(string itemName)
+    {
+        if (string.IsNullOrEmpty(itemName)) return false;
+        return itemName.Equals("Flashlight", System.StringComparison.OrdinalIgnoreCase) ||
+               itemName.Equals("fener", System.StringComparison.OrdinalIgnoreCase) ||
+               itemName.Equals("Torch", System.StringComparison.OrdinalIgnoreCase);
     }
 
     private void EnsureDragGhost()

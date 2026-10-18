@@ -17,10 +17,23 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] private SpriteRenderer spriteRenderer;
     [SerializeField] private Animator animator;
 
-    [Header("Flashlight")]
+    [Header("Flashlight Visual & Placement")]
+    [SerializeField] private Transform flashlightVisual;
+    [SerializeField] private SpriteRenderer flashlightSpriteRenderer;
+    [SerializeField] private Sprite flashlightSprite;
+    [Tooltip("Offset relative to character center for hand placement (X flips when facing left)")]
+    [SerializeField] private Vector2 flashlightHandOffset = new Vector2(-0.05f, -0.48f);
+    [Tooltip("Visual scale of the flashlight sprite")]
+    [SerializeField] private Vector3 flashlightVisualScale = new Vector3(0.12f, 0.12f, 1f);
+    [Tooltip("Forward offset from hand where the light beam originates")]
+    [SerializeField] private float flashlightLensOffset = 0.22f;
+    [Tooltip("Upward tilt angle in degrees for holding flashlight in hand")]
+    [SerializeField] private float flashlightUpwardAngle = 18f;
+
+    [Header("Flashlight Light")]
     [SerializeField] private Transform flashlightLight;
     [SerializeField] private Light2D flashlightBeam;
-    [Tooltip("Flashlight local offset relative to character (X will flip when facing left)")]
+    [Tooltip("Legacy offset (superseded by flashlightArmpitOffset + flashlightLensOffset)")]
     [SerializeField] private Vector2 flashlightOffset = new Vector2(0.18f, 0.05f);
     [SerializeField] private float smoothFollowSpeed = 12f;
 
@@ -37,10 +50,15 @@ public class PlayerMovement : MonoBehaviour
     private const float FOOTSTEP_INTERVAL = 0.34f;
     private bool prevFlashlightState = false;
 
+    public static bool IsFlashlightEquipped { get; set; } = false;
+    public static PlayerMovement Instance { get; private set; }
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetStaticData()
     {
         LastSavedPosition = null;
+        IsFlashlightEquipped = false;
+        Instance = null;
     }
 
     private void OnValidate()
@@ -58,6 +76,8 @@ public class PlayerMovement : MonoBehaviour
 
     private void Awake()
     {
+        Instance = this;
+
         if (spriteRenderer == null)
         {
             spriteRenderer = GetComponentInChildren<SpriteRenderer>();
@@ -70,7 +90,7 @@ public class PlayerMovement : MonoBehaviour
 
         EnsureFlashlight();
         EnsureCharacterLight();
-        ResetFlashlight();
+        UpdateFlashlightState();
 
         if (LastSavedPosition.HasValue)
         {
@@ -88,15 +108,24 @@ public class PlayerMovement : MonoBehaviour
         }
     }
 
+    private void OnDestroy()
+    {
+        if (Instance == this)
+        {
+            Instance = null;
+        }
+    }
+
     private void Start()
     {
         EnsureFlashlight();
         EnsureCharacterLight();
-        ResetFlashlight();
+        UpdateFlashlightState();
     }
 
     private void EnsureFlashlight()
     {
+        // 1. Flashlight Light Beam
         if (flashlightLight == null)
         {
             Transform found = transform.Find("FlashlightLight");
@@ -111,8 +140,61 @@ public class PlayerMovement : MonoBehaviour
             flashlightBeam = flashlightLight.GetComponent<Light2D>();
         }
 
-        // NOTE: flashlightBeam üzerindeki tüm açı, yarıçap, renk, gölge ayarları
-        // Unity Inspector'da nasıl ayarlandıysa aynen kullanılır, koddan ezilmez.
+        // 2. Flashlight Sprite Visual (held between armpits)
+        if (flashlightVisual == null)
+        {
+            Transform foundVisual = transform.Find("FlashlightVisual");
+            if (foundVisual != null)
+            {
+                flashlightVisual = foundVisual;
+            }
+            else
+            {
+                GameObject visualObj = new GameObject("FlashlightVisual");
+                visualObj.transform.SetParent(transform, false);
+                flashlightVisual = visualObj.transform;
+            }
+        }
+
+        if (flashlightVisual != null)
+        {
+            if (flashlightSpriteRenderer == null)
+            {
+                flashlightSpriteRenderer = flashlightVisual.GetComponent<SpriteRenderer>();
+                if (flashlightSpriteRenderer == null)
+                {
+                    flashlightSpriteRenderer = flashlightVisual.gameObject.AddComponent<SpriteRenderer>();
+                }
+            }
+
+            if (flashlightSprite == null)
+            {
+                flashlightSprite = InventoryUI.GetFlashlightSprite();
+            }
+
+            if (flashlightSpriteRenderer != null)
+            {
+                if (flashlightSprite != null)
+                {
+                    flashlightSpriteRenderer.sprite = flashlightSprite;
+                }
+
+                if (spriteRenderer != null)
+                {
+                    flashlightSpriteRenderer.sortingLayerID = spriteRenderer.sortingLayerID;
+                    // Render BEHIND the hand so the character's hand wraps in front of the flashlight
+                    flashlightSpriteRenderer.sortingOrder = spriteRenderer.sortingOrder - 1;
+                    flashlightSpriteRenderer.material = spriteRenderer.material;
+                }
+                else
+                {
+                    flashlightSpriteRenderer.sortingOrder = 9;
+                }
+            }
+
+            flashlightVisual.localScale = flashlightVisualScale;
+            flashlightVisual.gameObject.SetActive(IsFlashlightEquipped && !SwitchInteraction.IsAnyHazardActive);
+        }
     }
 
     private void EnsureCharacterLight()
@@ -201,6 +283,30 @@ public class PlayerMovement : MonoBehaviour
             if (l2d != null) l2d.enabled = false;
             flashlightLight.gameObject.SetActive(false);
         }
+
+        if (flashlightVisual != null)
+        {
+            flashlightVisual.gameObject.SetActive(false);
+        }
+    }
+
+    public void EquipFlashlight()
+    {
+        IsFlashlightEquipped = true;
+        EnsureFlashlight();
+        UpdateFacingAndFlashlight();
+        UpdateFlashlightState();
+    }
+
+    public static void SetFlashlightEquipped(bool equipped)
+    {
+        IsFlashlightEquipped = equipped;
+        if (Instance != null)
+        {
+            Instance.EnsureFlashlight();
+            Instance.UpdateFacingAndFlashlight();
+            Instance.UpdateFlashlightState();
+        }
     }
 
     public void TurnOffAllLights()
@@ -243,7 +349,7 @@ public class PlayerMovement : MonoBehaviour
         Vector3 direction = new Vector3(movement.x, movement.y, 0f);
         transform.position += direction * speed * Time.deltaTime;
 
-        // Sağa / sola dönme ve fener takibi
+        // Sağa / sola dönme ve fener takibi (elde tutulma + ışık huzmesi)
         UpdateFacingAndFlashlight();
 
         // Karakterin kendi üzerindeki küçük ışık (karanlıkta karakteri görünür tutar)
@@ -291,31 +397,76 @@ public class PlayerMovement : MonoBehaviour
             }
         }
 
+        bool facingLeft = spriteRenderer != null && spriteRenderer.flipX;
+
+        float tilt = 0f;
+        if (movement.y > 0.1f)
+        {
+            tilt = 10f;
+        }
+        else if (movement.y < -0.1f)
+        {
+            tilt = -10f;
+        }
+
+        float sway = 0f;
+        if (movement.sqrMagnitude > 0.01f)
+        {
+            sway = Mathf.Sin(Time.time * 8.5f) * 1.5f;
+        }
+
+        // Fenerin elde tutulma konumu (karakter yönüne göre X ekseninde döner)
+        Vector3 targetHandPos = new Vector3(facingLeft ? -flashlightHandOffset.x : flashlightHandOffset.x, flashlightHandOffset.y, 0f);
+
+        // Yukarıya doğru açı: Sağa bakarken +flashlightUpwardAngle, sola bakarken -flashlightUpwardAngle
+        float visualRotZ;
+        Vector3 dir;
+
+        if (!facingLeft)
+        {
+            visualRotZ = flashlightUpwardAngle + tilt + sway;
+            float rad = visualRotZ * Mathf.Deg2Rad;
+            dir = new Vector3(Mathf.Cos(rad), Mathf.Sin(rad), 0f);
+        }
+        else
+        {
+            visualRotZ = -flashlightUpwardAngle - tilt + sway;
+            float rad = (-visualRotZ) * Mathf.Deg2Rad;
+            dir = new Vector3(-Mathf.Cos(rad), Mathf.Sin(rad), 0f);
+        }
+
+        // 1. Eldeki Fener Görseli (Elin arkasında render edilir, ucu hafif yukarı yönlüdür)
+        if (flashlightVisual != null)
+        {
+            flashlightVisual.localPosition = Vector3.Lerp(flashlightVisual.localPosition, targetHandPos, Time.deltaTime * smoothFollowSpeed);
+
+            if (flashlightSpriteRenderer != null)
+            {
+                // fener.png görselinde fener başlığı soldadır.
+                // Karakter sağa bakarken başlık sağa bakmalı -> flipX = true.
+                // Karakter sola bakarken başlık sola bakmalı -> flipX = false.
+                flashlightSpriteRenderer.flipX = !facingLeft;
+
+                // Elin arkasında kalması için sıralama düzenini koru
+                if (spriteRenderer != null)
+                {
+                    flashlightSpriteRenderer.sortingLayerID = spriteRenderer.sortingLayerID;
+                    flashlightSpriteRenderer.sortingOrder = spriteRenderer.sortingOrder - 1;
+                }
+            }
+
+            flashlightVisual.localRotation = Quaternion.Euler(0f, 0f, visualRotZ);
+        }
+
+        // 2. Fenerin Işık Huzmesi (Light2D)
+        // Işık kaynağı fenerin ön ucundan/merceğinden yayılır ve fenerin açısıyla kusursuz hizalanır
         if (flashlightLight != null)
         {
-            bool facingLeft = spriteRenderer != null && spriteRenderer.flipX;
+            Vector3 targetLightPos = targetHandPos + dir * flashlightLensOffset;
+            flashlightLight.localPosition = Vector3.Lerp(flashlightLight.localPosition, targetLightPos, Time.deltaTime * smoothFollowSpeed);
 
-            // Inspector'dan yapılandırılabilen flashlightOffset (X yönü karakter yönüne göre döner)
-            Vector3 targetLocalPos = new Vector3(facingLeft ? -flashlightOffset.x : flashlightOffset.x, flashlightOffset.y, 0f);
-            flashlightLight.localPosition = Vector3.Lerp(flashlightLight.localPosition, targetLocalPos, Time.deltaTime * smoothFollowSpeed);
-
-            float tilt = 0f;
-            if (movement.y > 0.1f)
-            {
-                tilt = facingLeft ? -20f : 20f;
-            }
-            else if (movement.y < -0.1f)
-            {
-                tilt = facingLeft ? 20f : -20f;
-            }
-
-            float sway = 0f;
-            if (movement.sqrMagnitude > 0.01f)
-            {
-                sway = Mathf.Sin(Time.time * 8.5f) * 1.5f;
-            }
-
-            Quaternion targetRot = Quaternion.Euler(0f, 0f, targetFacingAngle + tilt + sway);
+            float lightRotZ = facingLeft ? (90f + visualRotZ) : (-90f + visualRotZ);
+            Quaternion targetRot = Quaternion.Euler(0f, 0f, lightRotZ);
             flashlightLight.localRotation = Quaternion.Slerp(flashlightLight.localRotation, targetRot, Time.deltaTime * smoothFollowSpeed);
         }
     }
@@ -340,28 +491,33 @@ public class PlayerMovement : MonoBehaviour
 
     private void UpdateFlashlightState()
     {
-        if (flashlightBeam == null && flashlightLight == null) return;
-
-        bool hasFlashlight = InventoryManager.HasItem("Flashlight");
+        bool hasFlashlight = InventoryManager.HasItem("Flashlight") || InventoryManager.HasItem("fener");
         if (!hasFlashlight && GameTimelineManager.Instance != null)
         {
             hasFlashlight = GameTimelineManager.Instance.HasFlashlight;
         }
 
-        // Fener Stage 3 başladığında otomatik olarak açılır (Stage 4'te de açık kalır)
-        bool isStage3OrLater = GameTimelineManager.Instance != null &&
-            (GameTimelineManager.Instance.CurrentStage == GameStage.Stage3_Utilities ||
-             GameTimelineManager.Instance.CurrentStage == GameStage.Stage4_Stairwell);
-
+        // Fener yalnızca envanterden sahneye sürüklendiğinde (kuşanıldığında) açılır!
+        bool isEquipped = hasFlashlight && IsFlashlightEquipped;
         bool isElectricityOn = GameTimelineManager.Instance != null && GameTimelineManager.Instance.IsElectricityRestored;
 
-        // Stage 1, Stage 2, Victory, Rewind/Reset/Hazard veya Elektrik açıldığında fener kapalı kalır
-        bool shouldFlashlightBeOn = hasFlashlight && isStage3OrLater && !SwitchInteraction.IsAnyHazardActive && !isElectricityOn;
-
-        // Timeline olmayan sahnede test ediliyorsa fener varsa açık tut
+        // Işık huzmesi yalnızca fener kuşanıldığında ve elektrik kesikken/karanlıkken yanar
+        bool shouldFlashlightBeOn = false;
         if (GameTimelineManager.Instance == null)
         {
-            shouldFlashlightBeOn = hasFlashlight && !SwitchInteraction.IsAnyHazardActive;
+            shouldFlashlightBeOn = isEquipped && !SwitchInteraction.IsAnyHazardActive;
+        }
+        else
+        {
+            shouldFlashlightBeOn = isEquipped && !SwitchInteraction.IsAnyHazardActive && !isElectricityOn;
+        }
+
+        // Eldeki fener görseli kuşanıldığı sürece karakterin elinde görünür kalır
+        bool shouldVisualBeShown = isEquipped && !SwitchInteraction.IsAnyHazardActive;
+
+        if (flashlightVisual != null && flashlightVisual.gameObject.activeSelf != shouldVisualBeShown)
+        {
+            flashlightVisual.gameObject.SetActive(shouldVisualBeShown);
         }
 
         if (flashlightBeam != null && flashlightBeam.enabled != shouldFlashlightBeOn)

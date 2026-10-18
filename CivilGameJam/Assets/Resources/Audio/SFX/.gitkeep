@@ -1,0 +1,32 @@
+# Place custom sound effect files (.wav, .mp3, .ogg) in this folder.
+# Supported names:
+# Footstep (or Footstep_L, Footstep_R)
+# FlashlightOn
+# FlashlightOff
+# LightSwitch
+# ItemPickup
+# HammerHit
+# AnchorSuccess
+# DrawerOpen
+# DrawerClose
+# CandlePuff
+# PaintingPlace
+# PaintingRattle
+# WardrobeCrash
+# CabinetCrash
+# Explosion
+# DoorLocked
+# DoorOpen
+# ValveTurn
+# ValveLatch
+# DolapStrain
+# DolapCreak
+# UIHover
+# UIClick
+# QTEHit
+# QTEMiss
+# PageTurn
+# TimeRewindWhoosh
+# TimeRewindTick
+# GasHiss
+# EarthquakeRumble
