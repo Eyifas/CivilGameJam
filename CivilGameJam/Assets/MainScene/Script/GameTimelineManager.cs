@@ -1616,8 +1616,7 @@ public class GameTimelineManager : MonoBehaviour
         if (playerMovement != null) playerMovement.ResetFlashlight();
         OnStageChanged?.Invoke(currentStage);
 
-        PlayEndingCutsceneSequence();
-    }
+       SceneManager.LoadScene("EndScene");    }
 
     public void ShowUrgentMessage(string msg)
     {

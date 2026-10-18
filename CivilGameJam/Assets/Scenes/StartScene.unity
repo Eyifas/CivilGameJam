@@ -880,6 +880,8 @@ MonoBehaviour:
   - {fileID: -5040669905953186056, guid: 4be46030e54d34c6e9015d68fad1b27f, type: 3}
   - {fileID: 8430968355662828279, guid: 36cd4c5fce1a048fdb2b105eeba31af0, type: 3}
   - {fileID: 4739336465439239406, guid: 60d3beaee9471461784d7b794cd1cda0, type: 3}
+  shakeStrength: 4.81
+  rotationStrength: -0.07
   gameSceneName: MainScene
 --- !u!1 &1974414094
 GameObject:
