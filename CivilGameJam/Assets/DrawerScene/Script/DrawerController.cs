@@ -47,6 +47,7 @@ public class DrawerController : MonoBehaviour
     private void Start()
     {
         UpdateItems();
+        TodoListUI.RegisterDrawerChecked();
     }
 
     public void ToggleLeftDrawer()
@@ -56,6 +57,7 @@ public class DrawerController : MonoBehaviour
 
         UpdateDrawerVisual();
         UpdateItems();
+        TodoListUI.RegisterDrawerChecked();
     }
 
     public void ToggleRightDrawer()
@@ -65,6 +67,7 @@ public class DrawerController : MonoBehaviour
 
         UpdateDrawerVisual();
         UpdateItems();
+        TodoListUI.RegisterDrawerChecked();
     }
 
     private void UpdateDrawerVisual()

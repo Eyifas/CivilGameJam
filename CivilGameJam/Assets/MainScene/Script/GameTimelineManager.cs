@@ -1273,6 +1273,7 @@ public class GameTimelineManager : MonoBehaviour
         PlayerMovement.ClearSavedPosition();
         PlayerMovement.SetFlashlightEquipped(false);
         SwitchInteraction.ResetAllHazardStates();
+        TodoListUI.ResetExplorationState();
 
         Time.timeScale = 1f;
 

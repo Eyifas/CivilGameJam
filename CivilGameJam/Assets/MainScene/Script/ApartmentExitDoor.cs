@@ -28,6 +28,8 @@ public class ApartmentExitDoor : MonoBehaviour
     private bool playerInside = false;
     private bool isEvacuated = false;
 
+    public bool IsEvacuated => isEvacuated;
+
     private void Awake()
     {
         if (Instance != null && Instance != this)
