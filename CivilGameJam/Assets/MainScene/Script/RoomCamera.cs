@@ -28,7 +28,8 @@ public class RoomCamera : MonoBehaviour
             (player.position.x - leftEdge) / roomWidth
         );
 
-        room = Mathf.Clamp(room, 0, 3);
+        // Artık sadece 3 oda var: 0, 1, 2
+        room = Mathf.Clamp(room, 0, 2);
 
         float cameraX = leftEdge + roomWidth * (room + 0.5f);
 
@@ -63,12 +64,22 @@ public class RoomCamera : MonoBehaviour
     public void StopEarthquake()
     {
         shakeTimeRemaining = 0f;
+
         if (player != null)
         {
-            int room = Mathf.FloorToInt((player.position.x - leftEdge) / roomWidth);
-            room = Mathf.Clamp(room, 0, 3);
+            int room = Mathf.FloorToInt(
+                (player.position.x - leftEdge) / roomWidth
+            );
+
+            room = Mathf.Clamp(room, 0, 2);
+
             float cameraX = leftEdge + roomWidth * (room + 0.5f);
-            transform.position = new Vector3(cameraX, initialY, initialZ);
+
+            transform.position = new Vector3(
+                cameraX,
+                initialY,
+                initialZ
+            );
         }
     }
 }

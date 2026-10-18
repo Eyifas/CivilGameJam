@@ -10,6 +10,7 @@ public class DrawerController : MonoBehaviour
     [SerializeField] private GameObject hammerObject;
     [SerializeField] private GameObject vidaObject;
     [SerializeField] private GameObject flashlightObject;
+    [SerializeField] private GameObject anahtarObject;
 
     private SpriteRenderer spriteRenderer;
 
@@ -33,6 +34,11 @@ public class DrawerController : MonoBehaviour
         if (flashlightObject != null)
         {
             flashlightObject.SetActive(false);
+        }
+
+        if (anahtarObject != null)
+        {
+            anahtarObject.SetActive(false);
         }
 
         UpdateDrawerVisual();
@@ -125,6 +131,18 @@ public class DrawerController : MonoBehaviour
             else
             {
                 flashlightObject.SetActive(leftOpen);
+            }
+        }
+
+        if (anahtarObject != null)
+        {
+            if (InventoryManager.HasItem("Anahtar"))
+            {
+                anahtarObject.SetActive(false);
+            }
+            else
+            {
+                anahtarObject.SetActive(leftOpen);
             }
         }
     }
