@@ -56,5 +56,12 @@ public class RoomCamera : MonoBehaviour
     public void StopEarthquake()
     {
         shakeTimeRemaining = 0f;
+        if (player != null)
+        {
+            int room = Mathf.FloorToInt((player.position.x - leftEdge) / roomWidth);
+            room = Mathf.Clamp(room, 0, 3);
+            float cameraX = leftEdge + roomWidth * (room + 0.5f);
+            transform.position = new Vector3(cameraX, initialY, initialZ);
+        }
     }
 }

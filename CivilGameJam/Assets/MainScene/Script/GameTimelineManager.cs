@@ -776,9 +776,10 @@ public class GameTimelineManager : MonoBehaviour
 
         Debug.Log($"<color=red>[TIME LOOP REWIND] (Used: {rewindsUsed}/{maxRewindsPerGame}, Remaining: {loopsRemaining}) {educationalReason}</color>");
 
+        if (playerMovement == null) playerMovement = FindFirstObjectByType<PlayerMovement>();
         if (playerMovement != null)
         {
-            playerMovement.ResetFlashlight();
+            playerMovement.TurnOffAllLights();
             playerMovement.enabled = false;
         }
         InventorySelection.ResetSelection();
@@ -820,9 +821,10 @@ public class GameTimelineManager : MonoBehaviour
         currentStage = GameStage.Rewinding;
         isTimerRunning = false;
 
+        if (playerMovement == null) playerMovement = FindFirstObjectByType<PlayerMovement>();
         if (playerMovement != null)
         {
-            playerMovement.ResetFlashlight();
+            playerMovement.TurnOffAllLights();
             playerMovement.enabled = false;
         }
         InventorySelection.ResetSelection();

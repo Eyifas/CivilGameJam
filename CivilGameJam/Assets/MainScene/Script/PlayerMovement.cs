@@ -170,6 +170,21 @@ public class PlayerMovement : MonoBehaviour
         light.enabled = true;
     }
 
+    private void OnEnable()
+    {
+        UpdateCharacterLight();
+        UpdateFlashlightState();
+    }
+
+    private void OnDisable()
+    {
+        TurnOffAllLights();
+        if (animator != null)
+        {
+            animator.SetBool("isWalking", false);
+        }
+    }
+
     public void ResetFlashlight()
     {
         if (flashlightBeam != null)
@@ -179,7 +194,28 @@ public class PlayerMovement : MonoBehaviour
 
         if (flashlightLight != null)
         {
+            var l2d = flashlightLight.GetComponent<Light2D>();
+            if (l2d != null) l2d.enabled = false;
             flashlightLight.gameObject.SetActive(false);
+        }
+    }
+
+    public void TurnOffAllLights()
+    {
+        ResetFlashlight();
+
+        if (characterLight != null)
+        {
+            characterLight.enabled = false;
+        }
+
+        Light2D[] allLights = GetComponentsInChildren<Light2D>(true);
+        foreach (var l in allLights)
+        {
+            if (l != null)
+            {
+                l.enabled = false;
+            }
         }
     }
 
@@ -272,6 +308,12 @@ public class PlayerMovement : MonoBehaviour
     {
         if (characterLight == null) return;
 
+        if (SwitchInteraction.IsAnyHazardActive)
+        {
+            if (characterLight.enabled) characterLight.enabled = false;
+            return;
+        }
+
         characterLight.transform.localPosition = new Vector3(characterLightOffset.x, characterLightOffset.y, 0f);
 
         if (!characterLight.enabled)
@@ -295,13 +337,13 @@ public class PlayerMovement : MonoBehaviour
             (GameTimelineManager.Instance.CurrentStage == GameStage.Stage3_Utilities ||
              GameTimelineManager.Instance.CurrentStage == GameStage.Stage4_Stairwell);
 
-        // Stage 1, Stage 2, Victory ve Rewind/Reset aşamalarında kapalı kalır
-        bool shouldFlashlightBeOn = hasFlashlight && isStage3OrLater;
+        // Stage 1, Stage 2, Victory ve Rewind/Reset/Hazard aşamalarında kapalı kalır
+        bool shouldFlashlightBeOn = hasFlashlight && isStage3OrLater && !SwitchInteraction.IsAnyHazardActive;
 
         // Timeline olmayan sahnede test ediliyorsa fener varsa açık tut
         if (GameTimelineManager.Instance == null)
         {
-            shouldFlashlightBeOn = hasFlashlight;
+            shouldFlashlightBeOn = hasFlashlight && !SwitchInteraction.IsAnyHazardActive;
         }
 
         if (flashlightBeam != null && flashlightBeam.enabled != shouldFlashlightBeOn)

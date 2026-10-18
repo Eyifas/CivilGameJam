@@ -240,6 +240,12 @@ public class HazardVisualManager : MonoBehaviour
             if (visualTransform != null)
             {
                 visualObj = visualTransform.gameObject;
+                var sr = visualObj.GetComponent<SpriteRenderer>();
+                if (sr != null)
+                {
+                    var unlitMat = SwitchInteraction.GetUnlitMaterial();
+                    if (unlitMat != null) sr.material = unlitMat;
+                }
             }
             else
             {
@@ -250,6 +256,11 @@ public class HazardVisualManager : MonoBehaviour
                 sr.sprite = tempSprite;
                 sr.sortingOrder = 20;
                 sr.color = config.tempColorTint;
+                var unlitMat = SwitchInteraction.GetUnlitMaterial();
+                if (unlitMat != null)
+                {
+                    sr.material = unlitMat;
+                }
 
                 // Size to full 16:9 screen
                 visualObj.transform.localScale = new Vector3(1f, 1f, 1f);

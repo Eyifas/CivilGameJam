@@ -50,6 +50,37 @@ public class SwitchInteraction : MonoBehaviour
     private bool playerInside = false;
     private bool triggered = false;
 
+    public static bool IsAnyHazardActive { get; private set; } = false;
+
+    private static Material s_unlitMaterial;
+    public static Material GetUnlitMaterial()
+    {
+        if (s_unlitMaterial != null) return s_unlitMaterial;
+
+        Shader shader = Shader.Find("Universal Render Pipeline/2D/Sprite-Unlit");
+        if (shader == null) shader = Shader.Find("Sprites/Default");
+        if (shader == null) shader = Shader.Find("Universal Render Pipeline/Unlit");
+        if (shader == null) shader = Shader.Find("Unlit/Texture");
+
+        if (shader != null)
+        {
+            s_unlitMaterial = new Material(shader);
+            s_unlitMaterial.name = "Hazard_Sprite_Unlit";
+        }
+#if UNITY_EDITOR
+        if (s_unlitMaterial == null)
+        {
+            string unlitPath = UnityEditor.AssetDatabase.GUIDToAssetPath("9dfc825aed78fcd4ba02077103263b40");
+            if (!string.IsNullOrEmpty(unlitPath))
+            {
+                var mat = UnityEditor.AssetDatabase.LoadAssetAtPath<Material>(unlitPath);
+                if (mat != null) s_unlitMaterial = new Material(mat);
+            }
+        }
+#endif
+        return s_unlitMaterial;
+    }
+
     public bool IsTriggered => triggered;
     public string EducationalReason => educationalReason;
     public GameObject InteractionPrompt => interactionPrompt;
@@ -113,6 +144,19 @@ public class SwitchInteraction : MonoBehaviour
         {
             interactionPrompt.SetActive(false);
         }
+        if (triggered)
+        {
+            triggered = false;
+            IsAnyHazardActive = false;
+        }
+    }
+
+    private void OnDestroy()
+    {
+        if (triggered)
+        {
+            IsAnyHazardActive = false;
+        }
     }
 
     private void EnsureSwitchImageReference()
@@ -138,6 +182,20 @@ public class SwitchInteraction : MonoBehaviour
                                 GameObject.Find("switchImage") ??
                                 GameObject.Find("DeathImage") ??
                                 GameObject.Find("Patlama");
+
+                if (candidate == null)
+                {
+                    var allTransforms = FindObjectsByType<Transform>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+                    foreach (var t in allTransforms)
+                    {
+                        if (t != null && (t.name == "1000000106_0" || t.name == "SwitchImage" || t.name == "switchImage" || t.name == "Patlama"))
+                        {
+                            candidate = t.gameObject;
+                            break;
+                        }
+                    }
+                }
+
                 if (candidate != null)
                 {
                     switchImage = candidate;
@@ -235,6 +293,8 @@ public class SwitchInteraction : MonoBehaviour
     {
         if (obj == null) return;
 
+        var unlitMat = GetUnlitMaterial();
+
         // 1. SpriteRenderers
         var spriteRenderers = obj.GetComponentsInChildren<SpriteRenderer>(true);
         foreach (var sr in spriteRenderers)
@@ -244,6 +304,12 @@ public class SwitchInteraction : MonoBehaviour
                 sr.sortingLayerName = sortingLayerName;
             }
             sr.sortingOrder = sortingOrder;
+
+            // Make sure the hazard visual is 100% unlit (full bright independent of room lighting / cut power)
+            if (unlitMat != null)
+            {
+                sr.material = unlitMat;
+            }
         }
 
         // 2. Canvases (if UI)
@@ -466,6 +532,7 @@ public class SwitchInteraction : MonoBehaviour
     private IEnumerator SwitchDeathSequence(string reason, float rewindSeconds, float holdDuration)
     {
         triggered = true;
+        IsAnyHazardActive = true;
 
         // 1. FREEZE / STOP TIME
         Time.timeScale = 0f;
@@ -474,11 +541,13 @@ public class SwitchInteraction : MonoBehaviour
             GameTimelineManager.Instance.PauseTimer();
         }
 
-        var player = FindFirstObjectByType<PlayerMovement>();
-        if (player != null)
+        // Immediately turn off all player lights (flashlight, character light, etc.)
+        var allPlayers = FindObjectsByType<PlayerMovement>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        foreach (var p in allPlayers)
         {
-            player.enabled = false;
-            var rb = player.GetComponent<Rigidbody2D>();
+            p.TurnOffAllLights();
+            p.enabled = false;
+            var rb = p.GetComponent<Rigidbody2D>();
             if (rb != null) rb.linearVelocity = Vector2.zero;
         }
 
@@ -507,6 +576,7 @@ public class SwitchInteraction : MonoBehaviour
         }
 
         // 3. Center on camera & display on Layer 20
+        EnsureSwitchImageReference();
         if (switchImage != null)
         {
             CenterOnCamera(switchImage);
@@ -537,11 +607,14 @@ public class SwitchInteraction : MonoBehaviour
                         GameTimelineManager.Instance.ResumeTimer();
                     }
                     triggered = false;
+                    IsAnyHazardActive = false;
                 },
                 onComplete: () =>
                 {
                     Time.timeScale = 1f;
                     RestoreGameUI();
+                    triggered = false;
+                    IsAnyHazardActive = false;
                     Debug.Log($"[HazardDeath] Rewind completed for: {reason}");
                 }
             );
@@ -562,12 +635,15 @@ public class SwitchInteraction : MonoBehaviour
                     RestoreGameUI();
                     Time.timeScale = 1f;
                     triggered = false;
+                    IsAnyHazardActive = false;
                 },
 
                 onComplete: () =>
                 {
                     Time.timeScale = 1f;
                     RestoreGameUI();
+                    triggered = false;
+                    IsAnyHazardActive = false;
                     Debug.Log($"[HazardDeath] Rewind completed for: {reason}");
                 }
             );
@@ -582,6 +658,7 @@ public class SwitchInteraction : MonoBehaviour
             Time.timeScale = 1f;
             RestoreGameUI();
             triggered = false;
+            IsAnyHazardActive = false;
         }
     }
 

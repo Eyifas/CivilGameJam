@@ -31,7 +31,8 @@ public class FlashlightController : MonoBehaviour
             (GameTimelineManager.Instance.CurrentStage != GameStage.Victory &&
              GameTimelineManager.Instance.CurrentStage != GameStage.Rewinding &&
              GameTimelineManager.Instance.CurrentStage != GameStage.Stage1_Preparation &&
-             GameTimelineManager.Instance.CurrentStage != GameStage.Stage2_Tremor);
+             GameTimelineManager.Instance.CurrentStage != GameStage.Stage2_Tremor &&
+             !SwitchInteraction.IsAnyHazardActive);
 
         flashlightLight.enabled = hasFlashlight && isStage3 && isGameActive;
     }
