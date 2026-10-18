@@ -148,7 +148,7 @@ public class ApartmentExitDoor : MonoBehaviour
             }
             else
             {
-                promptLabelText.text = "<color=#27AE60>Open Door & Evacuate</color>";
+                promptLabelText.text = "<color=#27AE60>Open Door [E]</color>";
             }
             promptObj.SetActive(true);
         }
@@ -227,13 +227,16 @@ public class ApartmentExitDoor : MonoBehaviour
                 return;
             }
 
-            // Safe Evacuation!
-            isEvacuated = true;
-            if (promptObj != null) promptObj.SetActive(false);
+            // Transition to DoorScene for key insertion and deadbolt rotation QTE
+            var player = GameObject.FindWithTag("Player");
+            if (player != null)
+            {
+                PlayerMovement.SavePosition(player.transform.position);
+            }
 
-            AudioManager.PlayDoorOpen();
-            Debug.Log("<color=green>[ExitDoor] Opened entrance door and safely evacuated apartment!</color>");
-            timeline.CompleteGameAndEvacuate();
+            AudioManager.PlayDoorLocked();
+            Debug.Log("<color=cyan>[ExitDoor] Opening DoorScene to unlock the front door!</color>");
+            UnityEngine.SceneManagement.SceneManager.LoadScene("DoorScene");
         }
     }
 

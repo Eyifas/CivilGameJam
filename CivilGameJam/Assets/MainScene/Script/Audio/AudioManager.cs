@@ -276,6 +276,7 @@ public class AudioManager : MonoBehaviour
 
             case "CupboardScene":
             case "DolapScene":
+            case "DoorScene":
                 PlayBGM(BgmTrack.MinigameTension, 0.6f);
                 break;
 

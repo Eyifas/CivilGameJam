@@ -1006,6 +1006,7 @@ MonoBehaviour:
   vidaSprite: {fileID: 21300000, guid: eb53e01ad43e74374996b35a42e86605, type: 3}
   flashlightSprite: {fileID: 21300000, guid: 42fbe00e5bc6e4ece861da89eefc3f96, type: 3}
   firstAidKitSprite: {fileID: 0}
+  keySprite: {fileID: -1054396813865584191, guid: c2f5726f617a24ef6bd86f079ae7ced6, type: 3}
 --- !u!114 &345583851
 MonoBehaviour:
   m_ObjectHideFlags: 0

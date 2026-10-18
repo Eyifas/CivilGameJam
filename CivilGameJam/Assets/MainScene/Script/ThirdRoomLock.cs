@@ -81,8 +81,8 @@ public class ThirdRoomLock : MonoBehaviour
             ePrompt.SetActive(false);
         }
 
-        // Anahtar kullanıldıktan sonra envanterden silinsin
-        InventoryManager.RemoveItem("Anahtar");
+        // Keep key in inventory so it can be used for the exit door in DoorScene
+        // InventoryManager.RemoveItem("Anahtar");
 
         Debug.Log("Kapının kilidi açıldı!");
     }

@@ -60,6 +60,15 @@ public static class InventoryManager
             }
         }
 
+        // Check aliases for key / anahtar
+        if (IsKey(itemName))
+        {
+            foreach (var it in items)
+            {
+                if (IsKey(it)) return true;
+            }
+        }
+
         return false;
     }
 
@@ -95,6 +104,21 @@ public static class InventoryManager
             }
         }
 
+        // Check aliases for key / anahtar
+        if (IsKey(itemName))
+        {
+            for (int i = items.Count - 1; i >= 0; i--)
+            {
+                if (IsKey(items[i]))
+                {
+                    string removed = items[i];
+                    items.RemoveAt(i);
+                    Debug.Log($"[InventoryManager] Item removed: {removed} (matched alias {itemName})");
+                    removedAny = true;
+                }
+            }
+        }
+
         return removedAny;
     }
 
@@ -105,6 +129,15 @@ public static class InventoryManager
                name.Equals("Screw", System.StringComparison.OrdinalIgnoreCase) ||
                name.Equals("Nail", System.StringComparison.OrdinalIgnoreCase) ||
                name.Equals("Nails", System.StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsKey(string name)
+    {
+        if (string.IsNullOrEmpty(name)) return false;
+        return name.Equals("Anahtar", System.StringComparison.OrdinalIgnoreCase) ||
+               name.Equals("Key", System.StringComparison.OrdinalIgnoreCase) ||
+               name.Equals("anahtar1", System.StringComparison.OrdinalIgnoreCase) ||
+               name.Equals("DrawerKey", System.StringComparison.OrdinalIgnoreCase);
     }
 
     public static List<string> GetItems()
