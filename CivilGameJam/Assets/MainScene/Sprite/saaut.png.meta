@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: 7b9d5da512a1f2f4bb5a03afd82e06e8
+guid: e1b2a3fb802884ce28eab3cc5fe7042c
 TextureImporter:
   internalIDToNameTable:
   - first:
@@ -105,12 +105,12 @@ TextureImporter:
       name: saaut_0
       rect:
         serializedVersion: 2
-        x: 0
-        y: 0
-        width: 1920
-        height: 1080
-      alignment: 9
-      pivot: {x: 0.49871, y: 0.51145}
+        x: 921
+        y: 521
+        width: 186
+        height: 115
+      alignment: 0
+      pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
