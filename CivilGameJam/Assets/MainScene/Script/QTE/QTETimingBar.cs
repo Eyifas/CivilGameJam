@@ -105,8 +105,8 @@ public class QTETimingBar : MonoBehaviour
 
         UpdatePointerVisual();
 
-        // Check Input: Space bar, W key, or Left Mouse Click
-        bool inputTriggered = (Keyboard.current != null && (Keyboard.current.spaceKey.wasPressedThisFrame || Keyboard.current.wKey.wasPressedThisFrame))
+        // Check Input: E key, Space bar, W key, or Left Mouse Click
+        bool inputTriggered = (Keyboard.current != null && (Keyboard.current.eKey.wasPressedThisFrame || Keyboard.current.spaceKey.wasPressedThisFrame || Keyboard.current.wKey.wasPressedThisFrame))
                            || (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame);
 
         if (inputTriggered)
@@ -183,7 +183,7 @@ public class QTETimingBar : MonoBehaviour
         }
         if (instructionText != null && string.IsNullOrEmpty(instructionText.text))
         {
-            instructionText.text = "Press SPACE or Click when inside the zone!";
+            instructionText.text = "Press [E], [SPACE], or Click when inside the zone!";
         }
     }
 

@@ -53,6 +53,13 @@ public class RoomCamera : MonoBehaviour
         shakeTimeRemaining = shakeDuration;
     }
 
+    public void StartScreenShake(float duration = 1.5f, float strength = 0.15f)
+    {
+        shakeDuration = duration;
+        shakeStrength = strength;
+        shakeTimeRemaining = duration;
+    }
+
     public void StopEarthquake()
     {
         shakeTimeRemaining = 0f;

@@ -33,6 +33,9 @@ public class PlayerMovement : MonoBehaviour
 
     private Vector2 movement;
     private float targetFacingAngle = -90f;
+    private float footstepTimer = 0f;
+    private const float FOOTSTEP_INTERVAL = 0.34f;
+    private bool prevFlashlightState = false;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetStaticData()
@@ -249,13 +252,26 @@ public class PlayerMovement : MonoBehaviour
         // Fenerin açık/kapalı durumunu kontrol et
         UpdateFlashlightState();
 
-        // Yürüme animasyonu
+        // Yürüme animasyonu ve ayak sesleri
+        bool isMoving = movement.sqrMagnitude > 0.01f;
         if (animator != null)
         {
-            animator.SetBool(
-                "isWalking",
-                movement.sqrMagnitude > 0.01f
-            );
+            animator.SetBool("isWalking", isMoving);
+        }
+
+        if (isMoving)
+        {
+            footstepTimer += Time.deltaTime;
+            if (footstepTimer >= FOOTSTEP_INTERVAL)
+            {
+                footstepTimer = 0f;
+                AudioManager.PlayFootstep();
+            }
+        }
+        else
+        {
+            // Reset to near interval so the first step upon resuming movement sounds promptly
+            footstepTimer = FOOTSTEP_INTERVAL * 0.85f;
         }
     }
 
@@ -337,8 +353,10 @@ public class PlayerMovement : MonoBehaviour
             (GameTimelineManager.Instance.CurrentStage == GameStage.Stage3_Utilities ||
              GameTimelineManager.Instance.CurrentStage == GameStage.Stage4_Stairwell);
 
-        // Stage 1, Stage 2, Victory ve Rewind/Reset/Hazard aşamalarında kapalı kalır
-        bool shouldFlashlightBeOn = hasFlashlight && isStage3OrLater && !SwitchInteraction.IsAnyHazardActive;
+        bool isElectricityOn = GameTimelineManager.Instance != null && GameTimelineManager.Instance.IsElectricityRestored;
+
+        // Stage 1, Stage 2, Victory, Rewind/Reset/Hazard veya Elektrik açıldığında fener kapalı kalır
+        bool shouldFlashlightBeOn = hasFlashlight && isStage3OrLater && !SwitchInteraction.IsAnyHazardActive && !isElectricityOn;
 
         // Timeline olmayan sahnede test ediliyorsa fener varsa açık tut
         if (GameTimelineManager.Instance == null)
@@ -354,6 +372,12 @@ public class PlayerMovement : MonoBehaviour
         if (flashlightLight != null && flashlightLight.gameObject.activeSelf != shouldFlashlightBeOn)
         {
             flashlightLight.gameObject.SetActive(shouldFlashlightBeOn);
+        }
+
+        if (prevFlashlightState != shouldFlashlightBeOn)
+        {
+            prevFlashlightState = shouldFlashlightBeOn;
+            AudioManager.PlayFlashlightToggle(shouldFlashlightBeOn);
         }
     }
 }

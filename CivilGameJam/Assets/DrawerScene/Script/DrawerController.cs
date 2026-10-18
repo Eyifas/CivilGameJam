@@ -46,6 +46,7 @@ public class DrawerController : MonoBehaviour
     public void ToggleLeftDrawer()
     {
         leftOpen = !leftOpen;
+        AudioManager.PlayDrawer(leftOpen);
 
         UpdateDrawerVisual();
         UpdateItems();
@@ -54,6 +55,7 @@ public class DrawerController : MonoBehaviour
     public void ToggleRightDrawer()
     {
         rightOpen = !rightOpen;
+        AudioManager.PlayDrawer(rightOpen);
 
         UpdateDrawerVisual();
         UpdateItems();

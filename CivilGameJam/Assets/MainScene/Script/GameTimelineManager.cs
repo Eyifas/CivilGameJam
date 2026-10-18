@@ -36,8 +36,10 @@ public struct TimelineSnapshot
 
     // Stage 3
     public bool isCabinetSecured;
+    public bool isDolapSecured;
     public bool isGasShutOff;
     public bool isBreakerShutOff;
+    public bool isElectricityRestored;
 
     // Stage 4 & 5
     public bool isPlanterMoved;
@@ -65,8 +67,16 @@ public class GameTimelineManager : MonoBehaviour
 
     [Header("Stage 3: State")]
     [SerializeField] private bool isCabinetSecured = false;
+    [SerializeField] private bool isDolapSecured = false;
     [SerializeField] private bool isGasShutOff = false;
     [SerializeField] private bool isBreakerShutOff = false;
+    [SerializeField] private bool isElectricityRestored = false;
+    public bool IsElectricityRestored => isElectricityRestored;
+    public void SetElectricityRestored(bool restored)
+    {
+        isElectricityRestored = restored;
+        OnStateUpdated?.Invoke();
+    }
 
     [Header("Stage 4 & 5: State")]
     [SerializeField] private bool isPlanterMoved = false;
@@ -79,6 +89,7 @@ public class GameTimelineManager : MonoBehaviour
     [SerializeField] private float stage3Duration = 30f;
     private float currentStageTimer = 0f;
     private bool isTimerRunning = false;
+    public float CurrentStageTimer => currentStageTimer;
 
     [Header("Time Loop Limits & Settings")]
     [SerializeField] private int maxRewindsPerGame = 3;
@@ -145,6 +156,10 @@ public class GameTimelineManager : MonoBehaviour
         RebindSceneReferences();
         if (scene.name == "MainScene")
         {
+            EnsureTimerTextReference();
+            SetHUDVisibility(true);
+            UpdateTimerHUD();
+
             if (currentStage == GameStage.Stage3_Utilities)
             {
                 EnableStage3Interactions();
@@ -160,9 +175,61 @@ public class GameTimelineManager : MonoBehaviour
     {
         if (roomCamera == null) roomCamera = FindFirstObjectByType<RoomCamera>();
         if (playerMovement == null) playerMovement = FindFirstObjectByType<PlayerMovement>();
+        if (roomCamera != null && playerMovement != null && roomCamera.player == null)
+        {
+            roomCamera.player = playerMovement.transform;
+        }
         if (stage2ChoiceGroup == null) stage2ChoiceGroup = FindFirstObjectByType<WorldChoiceGroup>(FindObjectsInactive.Include);
         EnsureCupboardTriggerZone();
+        EnsureMainSceneDolap();
         EnsureHazardVisualManager();
+        EnsureApartmentExitDoor();
+        EnsureTimerTextReference();
+    }
+
+    private void EnsureMainSceneDolap()
+    {
+        if (MainSceneDolap.Instance == null)
+        {
+            var dolap = GameObject.Find("düşme dolap1");
+            if (dolap == null)
+            {
+                var allSr = FindObjectsByType<SpriteRenderer>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+                foreach (var sr in allSr)
+                {
+                    if (sr.name.IndexOf("dolap", StringComparison.OrdinalIgnoreCase) >= 0 &&
+                        (sr.name.IndexOf("düşme", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                         sr.name.IndexOf("dsme", StringComparison.OrdinalIgnoreCase) >= 0))
+                    {
+                        dolap = sr.gameObject;
+                        break;
+                    }
+                }
+            }
+
+            if (dolap != null)
+            {
+                if (!dolap.TryGetComponent<MainSceneDolap>(out var msd))
+                {
+                    msd = dolap.AddComponent<MainSceneDolap>();
+                }
+                msd.SyncToTimelineState();
+            }
+        }
+    }
+
+    private void EnsureApartmentExitDoor()
+    {
+        if (ApartmentExitDoor.Instance == null)
+        {
+            var existing = FindFirstObjectByType<ApartmentExitDoor>();
+            if (existing == null)
+            {
+                var doorObj = new GameObject("ApartmentExitDoor");
+                doorObj.transform.position = new Vector3(16.8f, -1.8f, 0f);
+                doorObj.AddComponent<ApartmentExitDoor>();
+            }
+        }
     }
 
     private void EnsureHazardVisualManager()
@@ -291,8 +358,10 @@ public class GameTimelineManager : MonoBehaviour
             inventoryItems = InventoryManager.GetItemsCopy(),
 
             isCabinetSecured = isCabinetSecured,
+            isDolapSecured = isDolapSecured,
             isGasShutOff = isGasShutOff,
             isBreakerShutOff = isBreakerShutOff,
+            isElectricityRestored = isElectricityRestored,
 
             isPlanterMoved = isPlanterMoved,
             isNeighborTreated = isNeighborTreated,
@@ -337,6 +406,10 @@ public class GameTimelineManager : MonoBehaviour
         currentStage = GameStage.Stage1_Preparation;
         currentStageTimer = stage1Duration;
         isTimerRunning = true;
+
+        EnsureTimerTextReference();
+        SetHUDVisibility(true);
+        UpdateTimerHUD();
 
         if (playerMovement != null) playerMovement.enabled = true;
 
@@ -592,6 +665,29 @@ public class GameTimelineManager : MonoBehaviour
         }
     }
 
+    public void HandleDolapQTEResult(bool success)
+    {
+        if (currentStage != GameStage.Rewinding)
+        {
+            RecordActionSnapshot($"Hallway Dolap QTE: {success}");
+        }
+
+        isDolapSecured = success;
+        if (success)
+        {
+            Debug.Log("<color=green>[Timeline] Hallway wardrobe safely lifted and placed upright!</color>");
+            if (MainSceneDolap.Instance != null)
+            {
+                MainSceneDolap.Instance.SyncToTimelineState();
+            }
+        }
+        else
+        {
+            TriggerRewind("FATAL INJURY: The heavy wardrobe fell back onto you! You must brace and hold your footing firmly!");
+        }
+        OnStateUpdated?.Invoke();
+    }
+
     public void HandleUtilityAction(string action)
     {
         if (currentStage != GameStage.Rewinding)
@@ -727,7 +823,51 @@ public class GameTimelineManager : MonoBehaviour
             InventorySelection.ResetSelection();
             if (playerMovement != null) playerMovement.ResetFlashlight();
             OnStageChanged?.Invoke(currentStage);
+
+            // Display Comic Panel 4 Cliffhanger Ending
+            PlayEndingCutsceneSequence();
         }
+    }
+
+    private void PlayEndingCutsceneSequence()
+    {
+        if (playerMovement == null) playerMovement = FindFirstObjectByType<PlayerMovement>();
+        if (playerMovement != null)
+        {
+            playerMovement.TurnOffAllLights();
+            playerMovement.enabled = false;
+            var rb = playerMovement.GetComponent<Rigidbody2D>();
+            if (rb != null) rb.linearVelocity = Vector2.zero;
+        }
+
+        var roomCam = FindFirstObjectByType<RoomCamera>();
+        if (roomCam != null) roomCam.StopEarthquake();
+
+        SetHUDVisibility(false);
+
+        if (PersistentCanvas.Instance != null)
+        {
+            var pcCanvas = PersistentCanvas.Instance.GetComponent<Canvas>();
+            if (pcCanvas != null) pcCanvas.enabled = false;
+        }
+
+        if (QTEManager.Instance != null) QTEManager.Instance.CancelAll();
+        var choiceGroup = FindFirstObjectByType<WorldChoiceGroup>(FindObjectsInactive.Include);
+        if (choiceGroup != null) choiceGroup.gameObject.SetActive(false);
+
+        Debug.Log("<color=green>[VICTORY] Starting comic outro cutscene followed by hand-drawn success screen...</color>");
+
+        VictorySuccessDisplay.PlayOutroThenSuccess(
+            onRestart: () =>
+            {
+                ResetToCheckpoint();
+            },
+            onMainMenu: () =>
+            {
+                StartMenuController.ClearDontDestroyOnLoadObjects();
+                UnityEngine.SceneManagement.SceneManager.LoadScene("StartScene");
+            }
+        );
     }
 
     #endregion
@@ -748,13 +888,15 @@ public class GameTimelineManager : MonoBehaviour
     {
         if (currentStage == GameStage.Rewinding) return;
 
-        // If not already triggered from a hazard visual, trigger its visual sequence first
-        if (!isFromVisual && HazardVisualManager.Instance != null)
+        // If not already triggered from a hazard visual, display the comic failure visual first!
+        if (!isFromVisual)
         {
-            var hazard = HazardVisualManager.Instance.GetHazard(educationalReason);
-            if (hazard != null && !hazard.IsTriggered)
+            if (HazardVisualManager.Instance != null)
             {
-                hazard.TriggerSequence();
+                HazardVisualManager.Instance.ShowHazardVisual(educationalReason, () =>
+                {
+                    TriggerRewind(educationalReason, isFromVisual: true, onStateRestore, onComplete);
+                });
                 return;
             }
         }
@@ -800,12 +942,21 @@ public class GameTimelineManager : MonoBehaviour
             maxLoops: maxRewindsPerGame,
             onRewindStateRestore: () =>
             {
+                if (HazardVisualManager.Instance != null)
+                {
+                    HazardVisualManager.Instance.Hide();
+                }
+                SwitchInteraction.ResetAllHazardStates();
                 onStateRestore?.Invoke();
                 UndoLastFatalActionAndRestore(failedStage, educationalReason, addedDuration);
                 Time.timeScale = 1f;
             },
             onComplete: () =>
             {
+                if (HazardVisualManager.Instance != null)
+                {
+                    HazardVisualManager.Instance.Hide();
+                }
                 Time.timeScale = 1f;
                 onComplete?.Invoke();
                 if (playerMovement != null && currentStage != GameStage.Stage2_Tremor)
@@ -892,8 +1043,10 @@ public class GameTimelineManager : MonoBehaviour
         hasFirstAidKit = snapshot.hasFirstAidKit;
 
         isCabinetSecured = snapshot.isCabinetSecured;
+        isDolapSecured = snapshot.isDolapSecured;
         isGasShutOff = snapshot.isGasShutOff;
         isBreakerShutOff = snapshot.isBreakerShutOff;
+        isElectricityRestored = snapshot.isElectricityRestored;
 
         isPlanterMoved = snapshot.isPlanterMoved;
         isNeighborTreated = snapshot.isNeighborTreated;
@@ -1082,7 +1235,13 @@ public class GameTimelineManager : MonoBehaviour
             ctz.CheckStatus();
         }
 
-        // 3. Ensure prompts system refreshed
+        // 3. Update hallway dolap state
+        if (MainSceneDolap.Instance != null)
+        {
+            MainSceneDolap.Instance.SyncToTimelineState();
+        }
+
+        // 4. Ensure prompts system refreshed
         if (InteractionManager.Instance != null)
         {
             InteractionManager.Instance.ResetPromptsSystem();
@@ -1103,47 +1262,59 @@ public class GameTimelineManager : MonoBehaviour
         hasFlashlight = false;
         hasFirstAidKit = false;
         isCabinetSecured = false;
+        isDolapSecured = false;
         isGasShutOff = false;
         isBreakerShutOff = false;
+        isElectricityRestored = false;
 
-        var cupboardTriggers = FindObjectsByType<CupboardTriggerZone>(FindObjectsInactive.Include, FindObjectsSortMode.None);
-        foreach (var ctz in cupboardTriggers) ctz.CheckStatus();
-
-        // Reset Inventory & selection
         InventorySelection.ResetSelection();
         InventoryManager.ResetInventory();
-        if (playerMovement != null)
-        {
-            playerMovement.ResetFlashlight();
-        }
-
-        // Reset any physical room items (Flashlight, Medkit, Painting)
-        var items = FindObjectsByType<RoomItemInteractable>(FindObjectsSortMode.None);
-        foreach (var item in items)
-        {
-            item.ResetItem();
-        }
-
-        // Reset Bookshelf state
-        var bookshelf = FindFirstObjectByType<BookshelfAnchorInteractable>(FindObjectsInactive.Include);
-        if (bookshelf != null)
-        {
-            bookshelf.ResetState();
-        }
-        BookshelfSceneController.ResetToolState();
-
-        // Re-enable all interaction zones
-        ReEnableStage1Interactions();
-
         PlayerMovement.ClearSavedPosition();
+        SwitchInteraction.ResetAllHazardStates();
+
+        Time.timeScale = 1f;
+
+        // Cleanly reload MainScene and rebind all references including top-right timer
+        StartCoroutine(RestartMainSceneRoutine());
+    }
+
+    private IEnumerator RestartMainSceneRoutine()
+    {
+        Time.timeScale = 1f;
+
+        var op = SceneManager.LoadSceneAsync("MainScene");
+        while (!op.isDone)
+        {
+            yield return null;
+        }
+
+        yield return null; // Wait one frame for Awake/Start in MainScene
+
+        RebindSceneReferences();
+        EnsureTimerTextReference();
+        SetHUDVisibility(true);
+
+        if (playerMovement == null) playerMovement = FindFirstObjectByType<PlayerMovement>();
         if (playerMovement != null)
         {
             playerMovement.transform.position = new Vector3(-9.6f, -2.2f, 0f);
+            playerMovement.enabled = true;
+            playerMovement.ResetFlashlight();
         }
 
-        // Restart Stage 1
+        if (roomCamera == null) roomCamera = FindFirstObjectByType<RoomCamera>();
+        if (roomCamera != null)
+        {
+            if (playerMovement != null) roomCamera.player = playerMovement.transform;
+            roomCamera.StopEarthquake();
+        }
+
         StartStage1();
+        SetHUDVisibility(true);
+        UpdateTimerHUD();
         OnStateUpdated?.Invoke();
+
+        Debug.Log("<color=green>[Timeline] Successfully restarted run into fresh MainScene Stage 1 with top-right timer!</color>");
     }
 
     #endregion
@@ -1169,7 +1340,14 @@ public class GameTimelineManager : MonoBehaviour
         }
         else if (currentStage == GameStage.Stage3_Utilities)
         {
-            TriggerRewind("TIME RAN OUT: Lingered too long in an apartment with leaking natural gas!");
+            if (isGasShutOff)
+            {
+                TriggerRewind("BUILDING COLLAPSE: You lingered inside the damaged apartment after the earthquake! Buildings can collapse at any moment from structural weakening and aftershocks. Once utilities are secured, evacuate immediately!");
+            }
+            else
+            {
+                TriggerRewind("TIME RAN OUT: Lingered too long in an apartment with leaking natural gas!");
+            }
         }
     }
 
@@ -1186,8 +1364,148 @@ public class GameTimelineManager : MonoBehaviour
         StartStage2();
     }
 
+    public void EnsureTimerTextReference()
+    {
+        if (timerText != null && timerText.gameObject != null)
+        {
+            ActivateTimerHierarchy(timerText);
+            return;
+        }
+
+        // 1. Search for active or inactive GameObject named "FirstTime" (standard scene timer)
+        var allTmps = FindObjectsByType<TMP_Text>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        foreach (var tmp in allTmps)
+        {
+            if (tmp != null && (tmp.name == "FirstTime" || tmp.gameObject.name == "FirstTime"))
+            {
+                timerText = tmp;
+                ActivateTimerHierarchy(timerText);
+                Debug.Log("<color=cyan>[GameTimelineManager] Rebound timerText to 'FirstTime'.</color>");
+                return;
+            }
+        }
+
+        // 2. Search for any GameObject named "TimerText" or "Timer"
+        foreach (var tmp in allTmps)
+        {
+            if (tmp != null && (tmp.name == "TimerText" || tmp.name == "Timer" || tmp.name == "TimeText"))
+            {
+                if (tmp.transform.IsChildOf(transform)) continue;
+                if (tmp.GetComponentInParent<WorldChoiceGroup>() != null) continue;
+                if (tmp.GetComponentInParent<QTEMashPrompt>() != null) continue;
+
+                timerText = tmp;
+                ActivateTimerHierarchy(timerText);
+                Debug.Log($"<color=cyan>[GameTimelineManager] Rebound timerText to '{tmp.name}'.</color>");
+                return;
+            }
+        }
+
+        // 3. Procedural creation fallback in top-right of Canvas or PersistentCanvas if missing
+        EnsureProceduralTopRightTimer();
+    }
+
+    private void ActivateTimerHierarchy(TMP_Text txt)
+    {
+        if (txt == null) return;
+        txt.gameObject.SetActive(true);
+        txt.enabled = true;
+
+        Transform curr = txt.transform.parent;
+        while (curr != null)
+        {
+            curr.gameObject.SetActive(true);
+            var c = curr.GetComponent<Canvas>();
+            if (c != null)
+            {
+                c.enabled = true;
+                if (c.sortingOrder < 100)
+                {
+                    c.sortingOrder = 100;
+                }
+            }
+            curr = curr.parent;
+        }
+    }
+
+    private void EnsureProceduralTopRightTimer()
+    {
+        Canvas targetCanvas = null;
+        if (PersistentCanvas.Instance != null)
+        {
+            targetCanvas = PersistentCanvas.Instance.GetComponent<Canvas>();
+        }
+        if (targetCanvas == null)
+        {
+            targetCanvas = FindFirstObjectByType<Canvas>(FindObjectsInactive.Exclude);
+        }
+        if (targetCanvas == null)
+        {
+            targetCanvas = FindFirstObjectByType<Canvas>(FindObjectsInactive.Include);
+        }
+
+        if (targetCanvas == null)
+        {
+            GameObject canvasObj = new GameObject("HUDCanvas");
+            targetCanvas = canvasObj.AddComponent<Canvas>();
+            targetCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            targetCanvas.sortingOrder = 200;
+            var scaler = canvasObj.AddComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920, 1080);
+            scaler.matchWidthOrHeight = 0.5f;
+            canvasObj.AddComponent<GraphicRaycaster>();
+        }
+
+        targetCanvas.enabled = true;
+        targetCanvas.gameObject.SetActive(true);
+        if (targetCanvas.sortingOrder < 100) targetCanvas.sortingOrder = 100;
+
+        Transform existing = targetCanvas.transform.Find("ProceduralTimerText");
+        if (existing != null)
+        {
+            timerText = existing.GetComponent<TMP_Text>();
+            if (timerText != null)
+            {
+                timerText.gameObject.SetActive(true);
+                timerText.enabled = true;
+                return;
+            }
+        }
+
+        GameObject timerObj = new GameObject("ProceduralTimerText");
+        timerObj.transform.SetParent(targetCanvas.transform, false);
+
+        var rect = timerObj.AddComponent<RectTransform>();
+        rect.anchorMin = new Vector2(1f, 1f);
+        rect.anchorMax = new Vector2(1f, 1f);
+        rect.pivot = new Vector2(1f, 1f);
+        rect.anchoredPosition = new Vector2(-40f, -30f);
+        rect.sizeDelta = new Vector2(250f, 60f);
+
+        var tmpComp = timerObj.AddComponent<TextMeshProUGUI>();
+        tmpComp.fontSize = 38f;
+        tmpComp.fontStyle = FontStyles.Bold;
+        tmpComp.alignment = TextAlignmentOptions.Right;
+        tmpComp.color = Color.white;
+        tmpComp.text = "01:00";
+
+        var outline = timerObj.AddComponent<Outline>();
+        outline.effectColor = new Color(0f, 0f, 0f, 0.9f);
+        outline.effectDistance = new Vector2(2f, -2f);
+
+        timerText = tmpComp;
+        timerText.gameObject.SetActive(true);
+        Debug.Log("<color=cyan>[GameTimelineManager] Created procedural top-right timer HUD.</color>");
+    }
+
     private void UpdateTimerHUD()
     {
+        if (timerText == null || timerText.gameObject == null)
+        {
+            EnsureTimerTextReference();
+        }
+
         if (timerText != null)
         {
             int totalSeconds = Mathf.CeilToInt(currentStageTimer);
@@ -1221,9 +1539,19 @@ public class GameTimelineManager : MonoBehaviour
 
     public void SetHUDVisibility(bool visible)
     {
+        if (visible)
+        {
+            EnsureTimerTextReference();
+        }
+
         if (timerText != null && timerText.gameObject != null)
         {
             timerText.gameObject.SetActive(visible);
+            timerText.enabled = visible;
+            if (visible)
+            {
+                ActivateTimerHierarchy(timerText);
+            }
         }
         if (stageObjectiveText != null && stageObjectiveText.gameObject != null)
         {
@@ -1236,7 +1564,11 @@ public class GameTimelineManager : MonoBehaviour
         if (PersistentCanvas.Instance != null)
         {
             var c = PersistentCanvas.Instance.GetComponent<Canvas>();
-            if (c != null) c.enabled = visible;
+            if (c != null)
+            {
+                c.enabled = visible;
+                if (visible && c.sortingOrder < 100) c.sortingOrder = 100;
+            }
         }
     }
 
@@ -1248,6 +1580,7 @@ public class GameTimelineManager : MonoBehaviour
     public bool IsPaintingRemoved => isPaintingRemoved;
     public bool IsCandleExtinguished => isCandleExtinguished;
     public bool IsCabinetSecured => isCabinetSecured;
+    public bool IsDolapSecured => isDolapSecured;
     public bool IsGasShutOff => isGasShutOff;
     public bool IsBreakerShutOff => isBreakerShutOff;
 
@@ -1265,12 +1598,27 @@ public class GameTimelineManager : MonoBehaviour
             if (z.IsPipeZone()) z.SetInteractable(false);
         }
 
-        OnStateUpdated?.Invoke();
+        SetObjectiveText("OBJECTIVE: Gas shut off! Now open the entrance door and evacuate to the street before aftershocks!");
 
-        if (currentStage == GameStage.Stage3_Utilities && isBreakerShutOff)
-        {
-            AdvanceToStage4();
-        }
+        OnStateUpdated?.Invoke();
+    }
+
+    public void CompleteGameAndEvacuate()
+    {
+        Debug.Log("<color=green>[VICTORY] Player safely shut off gas and evacuated through the entrance door into the street!</color>");
+        currentStage = GameStage.Victory;
+        isTimerRunning = false;
+        SetObjectiveText("VICTORY! Safely evacuated the building into the street!");
+        InventorySelection.ResetSelection();
+        if (playerMovement != null) playerMovement.ResetFlashlight();
+        OnStageChanged?.Invoke(currentStage);
+
+        PlayEndingCutsceneSequence();
+    }
+
+    public void ShowUrgentMessage(string msg)
+    {
+        SetObjectiveText(msg);
     }
 
     #endregion

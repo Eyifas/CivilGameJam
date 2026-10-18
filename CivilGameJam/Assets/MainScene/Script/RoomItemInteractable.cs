@@ -120,11 +120,13 @@ public class RoomItemInteractable : MonoBehaviour
         {
             case ItemPickupType.Flashlight:
                 InventoryManager.AddItem("Flashlight");
+                AudioManager.PlayItemPickup();
                 gameObject.SetActive(false); // Collected into backpack
                 break;
 
             case ItemPickupType.FirstAidKit:
                 InventoryManager.AddItem("FirstAidKit");
+                AudioManager.PlayItemPickup();
                 gameObject.SetActive(false); // Collected into backpack
                 break;
 
@@ -133,6 +135,7 @@ public class RoomItemInteractable : MonoBehaviour
                 {
                     GameTimelineManager.Instance.SetPaintingRemoved(true);
                 }
+                AudioManager.PlayPaintingPlace();
                 // Hide the hanging painting, and optionally show it safely resting on floor
                 if (TryGetComponent<SpriteRenderer>(out var sr)) sr.enabled = false;
                 if (itemVisualOnFloor != null) itemVisualOnFloor.SetActive(true);

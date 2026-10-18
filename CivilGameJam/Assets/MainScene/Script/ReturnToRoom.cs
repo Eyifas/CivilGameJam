@@ -126,6 +126,8 @@ public class ReturnToRoom : MonoBehaviour
         if (CupboardSceneController.Instance != null && CupboardSceneController.Instance.IsBusy) return;
         if (TableSceneController.Instance != null && TableSceneController.Instance.IsBusy) return;
         if (PipeSceneController.Instance != null && PipeSceneController.Instance.IsBusy) return;
+        if (QTEManager.Instance != null && QTEManager.Instance.IsAnyQTEActive) return;
+        if (BookshelfSceneController.Instance != null && BookshelfSceneController.Instance.IsQTERunning) return;
 
         // Prevent immediate exit if player was holding [E] upon entering the scene
         if (!canExit)
@@ -162,6 +164,7 @@ public class ReturnToRoom : MonoBehaviour
         }
 
         isReturning = true;
+        AudioManager.PlayUIClick();
         string targetScene = string.IsNullOrEmpty(returnSceneName) ? "MainScene" : returnSceneName;
         Debug.Log($"[ReturnToRoom] Player exiting mini scene. Loading '{targetScene}'...");
         SceneManager.LoadScene(targetScene);

@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.IO;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
@@ -79,6 +80,12 @@ public class CupboardSceneController : MonoBehaviour
     private Image sliderFillImage;
     private RectTransform keyBadgeRect;
     private TMP_Text resultBannerText;
+
+    // Circular Hand-Drawn QTE Widget
+    private RectTransform circleContainer;
+    private Image trackRingImage;
+    private Image radialProgressRing;
+    private Image centerButtonImage;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void OnRuntimeSceneLoaded()
@@ -309,20 +316,9 @@ public class CupboardSceneController : MonoBehaviour
 
         if (mashTriggered)
         {
-            currentProgress += mashGainPerPress;
-            pushImpulse = Mathf.Min(pushImpulse + 0.18f, 0.45f);
-            PlaySound(customMashThump, synthMashThump, 0.7f);
-            TriggerCameraJolt(0.08f);
-
-            // Punch key badge animation
-            if (keyBadgeRect != null)
-            {
-                keyBadgeRect.localScale = Vector3.one * 1.3f;
-            }
-
+            TriggerMashStep();
             if (currentProgress >= 1f)
             {
-                OnQTESucceeded();
                 return;
             }
         }
@@ -561,82 +557,93 @@ public class CupboardSceneController : MonoBehaviour
         promptRect.anchorMax = new Vector2(0.5f, 0.82f);
         promptRect.sizeDelta = new Vector2(900f, 40f);
         promptText = promptObj.AddComponent<TextMeshProUGUI>();
-        promptText.text = "MASH [SPACE] OR [E] TO PUSH IT AWAY!";
+        promptText.text = "MASH [E] OR CLICK TO SECURE THE DOOR!";
         promptText.fontSize = 24;
         promptText.fontStyle = FontStyles.Bold;
         promptText.alignment = TextAlignmentOptions.Center;
         promptText.color = Color.white;
 
-        // Key Badge Icon ("[SPACE]")
-        GameObject badgeObj = new GameObject("KeyBadge");
-        badgeObj.transform.SetParent(qtePanel.transform, false);
-        keyBadgeRect = badgeObj.AddComponent<RectTransform>();
-        keyBadgeRect.anchorMin = new Vector2(0.5f, 0.44f);
-        keyBadgeRect.anchorMax = new Vector2(0.5f, 0.44f);
-        keyBadgeRect.sizeDelta = new Vector2(160f, 44f);
-        Image badgeBg = badgeObj.AddComponent<Image>();
-        badgeBg.color = new Color(0.12f, 0.15f, 0.22f, 0.85f);
+        // Circular Hand-Drawn QTE Widget
+        Sprite outerRingSprite = ResolveSprite("QTE_Outer_Ring.png");
+        Sprite trackRingSprite = ResolveSprite("QTE_Ring_Track.png");
+        Sprite eButtonSprite = ResolveSprite("QTE_Button_E.png");
 
-        GameObject badgeTextObj = new GameObject("BadgeText");
-        badgeTextObj.transform.SetParent(badgeObj.transform, false);
-        RectTransform btRect = badgeTextObj.AddComponent<RectTransform>();
-        btRect.anchorMin = Vector2.zero;
-        btRect.anchorMax = Vector2.one;
-        btRect.sizeDelta = Vector2.zero;
-        var badgeText = badgeTextObj.AddComponent<TextMeshProUGUI>();
-        badgeText.text = "[SPACE]";
-        badgeText.fontSize = 22;
-        badgeText.fontStyle = FontStyles.Bold;
-        badgeText.alignment = TextAlignmentOptions.Center;
-        badgeText.color = new Color(0.4f, 0.9f, 1f, 1f);
+        GameObject circleObj = new GameObject("CircleContainer");
+        circleObj.transform.SetParent(qtePanel.transform, false);
+        circleContainer = circleObj.AddComponent<RectTransform>();
+        circleContainer.anchorMin = new Vector2(0.5f, 0.45f);
+        circleContainer.anchorMax = new Vector2(0.5f, 0.45f);
+        circleContainer.sizeDelta = new Vector2(180f, 180f);
+        circleContainer.pivot = new Vector2(0.5f, 0.5f);
 
-        // Mash Progress Slider
-        GameObject sliderObj = new GameObject("MashSlider");
-        sliderObj.transform.SetParent(qtePanel.transform, false);
-        RectTransform sliderRect = sliderObj.AddComponent<RectTransform>();
-        sliderRect.anchorMin = new Vector2(0.5f, 0.06f);
-        sliderRect.anchorMax = new Vector2(0.5f, 0.06f);
-        sliderRect.sizeDelta = new Vector2(550f, 32f);
+        // Direct Mouse Click Support on Circular Area
+        var btn = circleObj.AddComponent<Button>();
+        var btnImg = circleObj.AddComponent<Image>();
+        btnImg.color = Color.clear;
+        btnImg.raycastTarget = true;
+        btn.targetGraphic = btnImg;
+        btn.transition = Selectable.Transition.None;
+        btn.onClick.AddListener(OnCircleClicked);
 
-        // Slider Background
-        Image sliderBg = sliderObj.AddComponent<Image>();
-        sliderBg.color = new Color(0.08f, 0.10f, 0.14f, 0.9f);
+        // Track Ring (Background ring)
+        GameObject trackObj = new GameObject("TrackRing");
+        trackObj.transform.SetParent(circleContainer, false);
+        RectTransform trackRt = trackObj.AddComponent<RectTransform>();
+        trackRt.anchorMin = Vector2.zero;
+        trackRt.anchorMax = Vector2.one;
+        trackRt.sizeDelta = Vector2.zero;
+        trackRingImage = trackObj.AddComponent<Image>();
+        trackRingImage.sprite = trackRingSprite != null ? trackRingSprite : outerRingSprite;
+        trackRingImage.color = new Color(181f / 255f, 191f / 255f, 127f / 255f, 0.25f);
+        trackRingImage.raycastTarget = false;
 
-        // Slider Fill Area
-        GameObject fillArea = new GameObject("FillArea");
-        fillArea.transform.SetParent(sliderObj.transform, false);
-        RectTransform fillAreaRect = fillArea.AddComponent<RectTransform>();
-        fillAreaRect.anchorMin = Vector2.zero;
-        fillAreaRect.anchorMax = Vector2.one;
-        fillAreaRect.sizeDelta = new Vector2(-8f, -8f);
+        // Radial Progress Ring (Fills clockwise as player mashes)
+        GameObject ringObj = new GameObject("RadialRing");
+        ringObj.transform.SetParent(circleContainer, false);
+        RectTransform ringRt = ringObj.AddComponent<RectTransform>();
+        ringRt.anchorMin = Vector2.zero;
+        ringRt.anchorMax = Vector2.one;
+        ringRt.sizeDelta = Vector2.zero;
+        radialProgressRing = ringObj.AddComponent<Image>();
+        radialProgressRing.sprite = outerRingSprite;
+        radialProgressRing.type = Image.Type.Filled;
+        radialProgressRing.fillMethod = Image.FillMethod.Radial360;
+        radialProgressRing.fillOrigin = (int)Image.Origin360.Top;
+        radialProgressRing.fillClockwise = true;
+        radialProgressRing.fillAmount = initialProgress;
+        radialProgressRing.color = new Color(181f / 255f, 191f / 255f, 127f / 255f, 1f);
+        radialProgressRing.raycastTarget = false;
 
-        GameObject fillObj = new GameObject("Fill");
-        fillObj.transform.SetParent(fillArea.transform, false);
-        RectTransform fillRect = fillObj.AddComponent<RectTransform>();
-        fillRect.anchorMin = Vector2.zero;
-        fillRect.anchorMax = Vector2.one;
-        fillRect.sizeDelta = Vector2.zero;
-        sliderFillImage = fillObj.AddComponent<Image>();
-        sliderFillImage.color = new Color(0.2f, 0.85f, 1f, 1f);
+        // Center Button [E] Graphic
+        GameObject centerBtnObj = new GameObject("CenterButton");
+        centerBtnObj.transform.SetParent(circleContainer, false);
+        RectTransform centerRt = centerBtnObj.AddComponent<RectTransform>();
+        centerRt.anchorMin = Vector2.zero;
+        centerRt.anchorMax = Vector2.one;
+        centerRt.sizeDelta = Vector2.zero;
+        centerButtonImage = centerBtnObj.AddComponent<Image>();
+        centerButtonImage.sprite = eButtonSprite;
+        centerButtonImage.type = Image.Type.Simple;
+        centerButtonImage.preserveAspect = true;
+        centerButtonImage.color = Color.white;
+        centerButtonImage.raycastTarget = false;
 
-        mashSlider = sliderObj.AddComponent<Slider>();
-        mashSlider.fillRect = fillRect;
-        mashSlider.minValue = 0f;
-        mashSlider.maxValue = 1f;
-        mashSlider.value = initialProgress;
+        // Link keyBadgeRect to circleContainer so punch animation scales the circular widget!
+        keyBadgeRect = circleContainer;
 
         // Timer Text
         GameObject timerObj = new GameObject("TimerText");
         timerObj.transform.SetParent(qtePanel.transform, false);
         RectTransform timerRect = timerObj.AddComponent<RectTransform>();
-        timerRect.anchorMin = new Vector2(0.5f, -0.18f);
-        timerRect.anchorMax = new Vector2(0.5f, -0.18f);
+        timerRect.anchorMin = new Vector2(0.5f, -0.05f);
+        timerRect.anchorMax = new Vector2(0.5f, -0.05f);
         timerRect.sizeDelta = new Vector2(400f, 30f);
         timerText = timerObj.AddComponent<TextMeshProUGUI>();
         timerText.text = "TIME: 5.5s";
-        timerText.fontSize = 20;
+        timerText.fontSize = 22;
+        timerText.fontStyle = FontStyles.Bold;
         timerText.alignment = TextAlignmentOptions.Center;
-        timerText.color = new Color(0.85f, 0.88f, 0.95f, 0.8f);
+        timerText.color = new Color(1f, 0.88f, 0.4f, 1f);
 
         // Result Banner (Success / Failure big announcement)
         GameObject bannerObj = new GameObject("ResultBanner");
@@ -656,24 +663,75 @@ public class CupboardSceneController : MonoBehaviour
         qtePanel.SetActive(false);
     }
 
-    private void UpdateUI()
+    private void OnCircleClicked()
     {
-        if (mashSlider != null)
+        if (!isQTEActive) return;
+        TriggerMashStep();
+    }
+
+    private void TriggerMashStep()
+    {
+        currentProgress += mashGainPerPress;
+        pushImpulse = Mathf.Min(pushImpulse + 0.18f, 0.45f);
+        PlaySound(customMashThump, synthMashThump, 0.7f);
+        TriggerCameraJolt(0.08f);
+
+        if (keyBadgeRect != null)
         {
-            mashSlider.value = currentProgress;
+            keyBadgeRect.localScale = Vector3.one * 1.15f;
         }
 
-        if (sliderFillImage != null)
+        if (currentProgress >= 1f)
         {
-            // Dynamic color: Red when critically low, Yellow in middle, Bright Cyan/Green when high
-            if (currentProgress < 0.35f)
+            OnQTESucceeded();
+        }
+    }
+
+    private Sprite ResolveSprite(string filename)
+    {
+        string baseName = Path.GetFileNameWithoutExtension(filename);
+        Sprite res = Resources.Load<Sprite>("UI/" + baseName) ?? Resources.Load<Sprite>(baseName);
+        if (res != null) return res;
+
+#if UNITY_EDITOR
+        string assetPath = "Assets/MainScene/Sprite/UI/" + filename;
+        Sprite adSprite = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>(assetPath);
+        if (adSprite != null) return adSprite;
+#endif
+
+        string fullPath = Path.Combine(Application.dataPath, "MainScene/Sprite/UI", filename);
+        if (File.Exists(fullPath))
+        {
+            byte[] bytes = File.ReadAllBytes(fullPath);
+            Texture2D tex = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+            if (tex.LoadImage(bytes))
             {
-                sliderFillImage.color = Color.Lerp(Color.red, Color.yellow, currentProgress / 0.35f);
+                return Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f), 100f);
+            }
+        }
+        return null;
+    }
+
+    private void UpdateUI()
+    {
+        if (radialProgressRing != null)
+        {
+            radialProgressRing.fillAmount = currentProgress;
+
+            if (currentProgress < 0.25f)
+            {
+                float pulse = Mathf.PingPong(Time.time * 10f, 1f);
+                radialProgressRing.color = Color.Lerp(new Color(181f / 255f, 191f / 255f, 127f / 255f, 1f), new Color(243f / 255f, 156f / 255f, 18f / 255f, 1f), pulse);
             }
             else
             {
-                sliderFillImage.color = Color.Lerp(Color.yellow, new Color(0.2f, 1f, 0.5f, 1f), (currentProgress - 0.35f) / 0.65f);
+                radialProgressRing.color = new Color(181f / 255f, 191f / 255f, 127f / 255f, 1f);
             }
+        }
+
+        if (mashSlider != null)
+        {
+            mashSlider.value = currentProgress;
         }
 
         if (timerText != null)

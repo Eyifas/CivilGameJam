@@ -50,7 +50,7 @@ public class SwitchInteraction : MonoBehaviour
     private bool playerInside = false;
     private bool triggered = false;
 
-    public static bool IsAnyHazardActive { get; private set; } = false;
+    public static bool IsAnyHazardActive { get; set; } = false;
 
     private static Material s_unlitMaterial;
     public static Material GetUnlitMaterial()
@@ -303,7 +303,15 @@ public class SwitchInteraction : MonoBehaviour
             {
                 sr.sortingLayerName = sortingLayerName;
             }
-            sr.sortingOrder = sortingOrder;
+
+            if (sr.gameObject.name == "Backdrop")
+            {
+                sr.sortingOrder = sortingOrder - 1; // Always 19, strictly behind the comic panel!
+            }
+            else
+            {
+                sr.sortingOrder = sortingOrder; // 20
+            }
 
             // Make sure the hazard visual is 100% unlit (full bright independent of room lighting / cut power)
             if (unlitMat != null)
@@ -464,12 +472,71 @@ public class SwitchInteraction : MonoBehaviour
             return;
         }
 
-        if (playerInside &&
-            !triggered &&
-            Keyboard.current != null &&
-            Keyboard.current.eKey.wasPressedThisFrame)
+        // Dynamic prompt label
+        if (GameTimelineManager.Instance != null && GameTimelineManager.Instance.IsGasShutOff)
         {
-            TriggerSequence();
+            SetPromptLabel(GameTimelineManager.Instance.IsElectricityRestored ? "Turn Off Electricity" : "Turn On Electricity");
+        }
+
+        bool ePressed = Keyboard.current != null && Keyboard.current.eKey.wasPressedThisFrame;
+        bool clickPressed = Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame;
+
+        if (playerInside && !triggered && (ePressed || clickPressed))
+        {
+            // If gas is NOT shut off -> EXPLOSION!
+            if (GameTimelineManager.Instance != null && !GameTimelineManager.Instance.IsGasShutOff)
+            {
+                TriggerSequence();
+            }
+            else
+            {
+                // Gas IS shut off -> Safe to flip switch and turn on house electricity!
+                ToggleSafeLight();
+            }
+        }
+    }
+
+    private bool isSafeLightOn = false;
+    private GameObject safeRoomLightObj;
+
+    private void ToggleSafeLight()
+    {
+        var timeline = GameTimelineManager.Instance;
+        if (timeline != null)
+        {
+            bool newState = !timeline.IsElectricityRestored;
+            timeline.SetElectricityRestored(newState);
+            AudioManager.PlaySwitchToggle(newState);
+            SetPromptLabel(newState ? "Turn Off Electricity" : "Turn On Electricity");
+            Debug.Log($"<color=yellow>[LightSwitch] House electricity switched {(newState ? "ON" : "OFF")}. Safe operation because gas valve was turned off.</color>");
+        }
+        else
+        {
+            isSafeLightOn = !isSafeLightOn;
+            AudioManager.PlaySwitchToggle(isSafeLightOn);
+            if (safeRoomLightObj == null)
+            {
+                safeRoomLightObj = new GameObject("KitchenSafeRoomLight");
+                safeRoomLightObj.transform.position = transform.position + new Vector3(0f, 1f, 0f);
+                var light2D = safeRoomLightObj.AddComponent<UnityEngine.Rendering.Universal.Light2D>();
+                light2D.lightType = UnityEngine.Rendering.Universal.Light2D.LightType.Point;
+                light2D.color = new Color(1f, 0.95f, 0.8f, 1f);
+                light2D.intensity = 1.4f;
+                light2D.pointLightOuterRadius = 6.5f;
+                light2D.pointLightInnerRadius = 1.2f;
+            }
+            if (safeRoomLightObj != null) safeRoomLightObj.SetActive(isSafeLightOn);
+            SetPromptLabel(isSafeLightOn ? "Turn Off Light" : "Turn On Light");
+        }
+    }
+
+    public static void ResetAllHazardStates()
+    {
+        IsAnyHazardActive = false;
+        var allSwitches = FindObjectsByType<SwitchInteraction>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        foreach (var s in allSwitches)
+        {
+            if (s != null) s.triggered = false;
         }
     }
 
@@ -479,7 +546,23 @@ public class SwitchInteraction : MonoBehaviour
     public void TriggerSequence()
     {
         if (triggered) return;
-        StartCoroutine(SwitchDeathSequence(educationalReason, rewindDuration, imageDuration));
+        triggered = true;
+        IsAnyHazardActive = true;
+
+        if (GameTimelineManager.Instance != null)
+        {
+            GameTimelineManager.Instance.TriggerRewind(educationalReason);
+        }
+        else if (HazardVisualManager.Instance != null)
+        {
+            HazardVisualManager.Instance.ShowHazardVisual(educationalReason, () =>
+            {
+                if (TimeRewindController.Instance != null)
+                {
+                    TimeRewindController.Instance.PlayTimeRewind(educationalReason, rewindDuration, () => {}, () => { triggered = false; IsAnyHazardActive = false; });
+                }
+            });
+        }
     }
 
     /// <summary>
@@ -488,7 +571,23 @@ public class SwitchInteraction : MonoBehaviour
     public void TriggerSequence(string customReason, float customRewindDuration, float customImageDuration = 1.5f)
     {
         if (triggered) return;
-        StartCoroutine(SwitchDeathSequence(customReason, customRewindDuration, customImageDuration));
+        triggered = true;
+        IsAnyHazardActive = true;
+
+        if (GameTimelineManager.Instance != null)
+        {
+            GameTimelineManager.Instance.TriggerRewind(customReason);
+        }
+        else if (HazardVisualManager.Instance != null)
+        {
+            HazardVisualManager.Instance.ShowHazardVisual(customReason, () =>
+            {
+                if (TimeRewindController.Instance != null)
+                {
+                    TimeRewindController.Instance.PlayTimeRewind(customReason, customRewindDuration, () => {}, () => { triggered = false; IsAnyHazardActive = false; });
+                }
+            });
+        }
     }
 
     /// <summary>
@@ -497,24 +596,20 @@ public class SwitchInteraction : MonoBehaviour
     /// </summary>
     public static void PlayHazardDeathVisual(GameObject imageObj, string reason, float rewindSeconds = 5f, float holdDuration = 1.5f, int order = 20)
     {
-        if (imageObj == null)
+        if (GameTimelineManager.Instance != null)
         {
-            if (TimeRewindController.Instance != null)
+            GameTimelineManager.Instance.TriggerRewind(reason);
+        }
+        else if (HazardVisualManager.Instance != null)
+        {
+            HazardVisualManager.Instance.ShowHazardVisual(reason, () =>
             {
-                TimeRewindController.Instance.PlayTimeRewind(reason, rewindSeconds, () => {}, () => {});
-            }
-            return;
+                if (TimeRewindController.Instance != null)
+                {
+                    TimeRewindController.Instance.PlayTimeRewind(reason, rewindSeconds, () => {}, () => {});
+                }
+            });
         }
-
-        var comp = imageObj.GetComponent<SwitchInteraction>();
-        if (comp == null)
-        {
-            comp = imageObj.AddComponent<SwitchInteraction>();
-            comp.switchImage = imageObj;
-            comp.triggerOnInteract = false;
-            comp.sortingOrder = order;
-        }
-        comp.TriggerSequence(reason, rewindSeconds, holdDuration);
     }
 
     public void CenterOnCamera(GameObject obj)
@@ -526,6 +621,36 @@ public class SwitchInteraction : MonoBehaviour
         {
             Vector3 camPos = cam.transform.position;
             obj.transform.position = new Vector3(camPos.x, camPos.y, -1f);
+            FitVisualToCamera(obj, cam);
+        }
+    }
+
+    private void FitVisualToCamera(GameObject obj, Camera cam)
+    {
+        var sr = obj.GetComponent<SpriteRenderer>();
+        if (sr != null && sr.sprite != null && cam.orthographic)
+        {
+            float camHeight = cam.orthographicSize * 2f;
+            float camWidth = camHeight * cam.aspect;
+            float spriteW = sr.sprite.rect.width / sr.sprite.pixelsPerUnit;
+            float spriteH = sr.sprite.rect.height / sr.sprite.pixelsPerUnit;
+
+            if (spriteW > 0.001f && spriteH > 0.001f)
+            {
+                // Fit nicely within camera viewport preserving aspect ratio
+                float scale = Mathf.Min(camHeight / spriteH, camWidth / spriteW);
+                obj.transform.localScale = new Vector3(scale, scale, 1f);
+
+                // Adjust Backdrop scale so it covers entire camera screen behind this scaled sprite
+                var backdrop = obj.transform.Find("Backdrop");
+                if (backdrop != null)
+                {
+                    float bdW = (camWidth * 1.5f) / scale;
+                    float bdH = (camHeight * 1.5f) / scale;
+                    backdrop.localScale = new Vector3(bdW, bdH, 1f);
+                    backdrop.localPosition = new Vector3(0f, 0f, 0.05f);
+                }
+            }
         }
     }
 
@@ -533,6 +658,7 @@ public class SwitchInteraction : MonoBehaviour
     {
         triggered = true;
         IsAnyHazardActive = true;
+        AudioManager.PlayExplosion();
 
         // 1. FREEZE / STOP TIME
         Time.timeScale = 0f;

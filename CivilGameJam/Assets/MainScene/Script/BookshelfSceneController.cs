@@ -40,6 +40,7 @@ public class BookshelfSceneController : MonoBehaviour
     private bool isNailsPlaced = false;
     private bool isAnchored = false;
     private bool isQTERunning = false;
+    public bool IsQTERunning => isQTERunning;
     private bool areToolsPlaced = false;
     private string currentInstruction = "";
 
@@ -262,6 +263,7 @@ public class BookshelfSceneController : MonoBehaviour
 
         if (sprite != null)
         {
+            AudioManager.PlaySFX(SFXType.ToolPlace);
             GameObject ghost = new GameObject("ToolDisappearEffect");
             ghost.transform.position = new Vector3(worldPos.x, worldPos.y, 0f);
             ghost.transform.localScale = Vector3.one * 1.15f;
@@ -378,6 +380,7 @@ public class BookshelfSceneController : MonoBehaviour
             GameTimelineManager.Instance.SetBookshelfAnchored(true);
         }
 
+        AudioManager.PlayAnchorSuccess();
         UpdateInstruction("<color=green>Bookshelf securely anchored! Returning to room...</color>");
 
         StartCoroutine(ReturnToRoomRoutine());

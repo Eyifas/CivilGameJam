@@ -63,14 +63,16 @@ public class WorldChoiceGroup : MonoBehaviour
             timerDisplayRoot.SetActive(true);
         }
 
+        // Hide top slider bar — the timer slider is now around the buttons themselves!
         if (timerBar != null)
         {
-            timerBar.gameObject.SetActive(true);
+            timerBar.gameObject.SetActive(false);
         }
 
+        // Hide top countdown text to match bookshelf scene aesthetic
         if (timerText != null)
         {
-            timerText.gameObject.SetActive(true);
+            timerText.gameObject.SetActive(false);
         }
 
         if (headerTitleText != null)
@@ -126,14 +128,29 @@ public class WorldChoiceGroup : MonoBehaviour
 
     private void UpdateTimerVisuals()
     {
-        if (timerBar != null)
+        float ratio = Mathf.Clamp01(timeRemaining / totalDuration);
+
+        // Update the radial timer rings around each choice button
+        if (choiceOptions != null)
         {
-            timerBar.value = Mathf.Clamp01(timeRemaining / totalDuration);
+            for (int i = 0; i < choiceOptions.Count; i++)
+            {
+                if (choiceOptions[i].promptObject != null)
+                {
+                    choiceOptions[i].promptObject.UpdateTimerProgress(ratio);
+                }
+            }
         }
 
-        if (timerText != null)
+        // Keep top timer bar hidden
+        if (timerBar != null && timerBar.gameObject.activeSelf)
         {
-            timerText.text = $"{timeRemaining:F1}s";
+            timerBar.gameObject.SetActive(false);
+        }
+
+        if (timerText != null && timerText.gameObject.activeSelf)
+        {
+            timerText.gameObject.SetActive(false);
         }
     }
 

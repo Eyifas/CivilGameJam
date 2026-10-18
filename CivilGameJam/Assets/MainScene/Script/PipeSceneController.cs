@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.IO;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
@@ -459,10 +460,36 @@ public class PipeSceneController : MonoBehaviour
         grabIndicatorTransform.position = boltWorldPos + new Vector3(Mathf.Cos(initRad), Mathf.Sin(initRad), 0f) * leverGripRadius;
 
         grabIndicatorSr = grabIndicatorObj.AddComponent<SpriteRenderer>();
-        grabIndicatorSr.sprite = CreateCircleSprite(48);
-        grabIndicatorSr.color = new Color(1f, 0.85f, 0.2f, 0.85f);
+        Sprite handDrawnBtn = ResolveSprite("QTE_Button_E.png");
+        grabIndicatorSr.sprite = handDrawnBtn != null ? handDrawnBtn : CreateCircleSprite(48);
+        grabIndicatorSr.color = Color.white;
         grabIndicatorSr.sortingOrder = 10;
-        grabIndicatorTransform.localScale = Vector3.one * 0.9f;
+        grabIndicatorTransform.localScale = Vector3.one * (handDrawnBtn != null ? 0.35f : 0.9f);
+    }
+
+    private Sprite ResolveSprite(string filename)
+    {
+        string baseName = Path.GetFileNameWithoutExtension(filename);
+        Sprite res = Resources.Load<Sprite>("UI/" + baseName) ?? Resources.Load<Sprite>(baseName);
+        if (res != null) return res;
+
+#if UNITY_EDITOR
+        string assetPath = "Assets/MainScene/Sprite/UI/" + filename;
+        Sprite adSprite = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>(assetPath);
+        if (adSprite != null) return adSprite;
+#endif
+
+        string fullPath = Path.Combine(Application.dataPath, "MainScene/Sprite/UI", filename);
+        if (File.Exists(fullPath))
+        {
+            byte[] bytes = File.ReadAllBytes(fullPath);
+            Texture2D tex = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+            if (tex.LoadImage(bytes))
+            {
+                return Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f), 100f);
+            }
+        }
+        return null;
     }
 
     private Sprite CreateCircleSprite(int size)
@@ -770,16 +797,17 @@ public class PipeSceneController : MonoBehaviour
         // Animate grab indicator pulse
         if (grabIndicatorTransform != null)
         {
+            float baseScale = (grabIndicatorSr != null && grabIndicatorSr.sprite != null && grabIndicatorSr.sprite.rect.width > 200f) ? 0.35f : 0.9f;
             if (isDragging || isKeyboardTurning)
             {
-                grabIndicatorTransform.localScale = Vector3.one * 1.25f;
-                if (grabIndicatorSr != null) grabIndicatorSr.color = new Color(0.2f, 1f, 0.5f, 0.95f);
+                grabIndicatorTransform.localScale = Vector3.one * (baseScale * 1.25f);
+                if (grabIndicatorSr != null) grabIndicatorSr.color = new Color(0.2f, 1f, 0.5f, 1f);
             }
             else
             {
-                float pulse = 0.9f + Mathf.Sin(Time.time * 5.5f) * 0.15f;
-                grabIndicatorTransform.localScale = Vector3.one * pulse;
-                if (grabIndicatorSr != null) grabIndicatorSr.color = new Color(1f, 0.85f, 0.25f, 0.85f);
+                float pulse = 1.0f + Mathf.Sin(Time.time * 5.5f) * 0.12f;
+                grabIndicatorTransform.localScale = Vector3.one * (baseScale * pulse);
+                if (grabIndicatorSr != null) grabIndicatorSr.color = Color.white;
             }
         }
     }
@@ -861,6 +889,8 @@ public class PipeSceneController : MonoBehaviour
 
         // Play heavy latch lock sound
         PlayValveLatch();
+        AudioManager.SetGasHissActive(false);
+        AudioManager.PlayAnchorSuccess();
 
         // Update Timeline State
         if (GameTimelineManager.Instance != null)

@@ -52,10 +52,17 @@ public class EarthquakeLightController : MonoBehaviour
             }
         }
 
-        // Deprem sonrası: elektrik tamamen kesiliyor
+        // Deprem sonrası: elektrik tamamen kesiliyor (gaz kapatılıp şalter açılınca tekrar gelir)
         else if (stage == GameStage.Stage3_Utilities)
         {
-            globalLight.intensity = 0f;
+            if (GameTimelineManager.Instance != null && GameTimelineManager.Instance.IsElectricityRestored)
+            {
+                globalLight.intensity = normalIntensity;
+            }
+            else
+            {
+                globalLight.intensity = 0f;
+            }
         }
     }
 }

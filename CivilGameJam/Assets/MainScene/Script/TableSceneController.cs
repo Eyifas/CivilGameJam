@@ -223,6 +223,7 @@ public class TableSceneController : MonoBehaviour
         if (candleExtinguished) return;
 
         candleExtinguished = true;
+        AudioManager.PlayCandlePuff();
         SetTableVisuals(true);
 
         if (GameTimelineManager.Instance != null)
@@ -371,6 +372,7 @@ public class TableSceneController : MonoBehaviour
             }
 
             paintingTransform.localPosition = targetFloorPos;
+            AudioManager.PlayPaintingPlace();
         }
 
         loweringCoroutine = null;
@@ -389,6 +391,7 @@ public class TableSceneController : MonoBehaviour
     {
         if (paintingTransform == null) yield break;
 
+        AudioManager.PlayPaintingRattle();
         Vector3 basePos = paintingTransform.localPosition;
         float duration = 0.25f;
         float elapsed = 0f;
@@ -411,6 +414,7 @@ public class TableSceneController : MonoBehaviour
         if (candleExtinguished && paintingSafe)
         {
             isTransitioningBack = true;
+            AudioManager.PlayAnchorSuccess();
             UpdateInstruction("<color=green>All secured! Table flame extinguished and painting safe. Returning...</color>");
             StartCoroutine(ReturnToRoomRoutine());
         }

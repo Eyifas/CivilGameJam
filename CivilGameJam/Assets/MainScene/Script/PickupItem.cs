@@ -46,6 +46,7 @@ public class PickupItem : MonoBehaviour
     {
         // Envantere ekle
         InventoryManager.AddItem(itemName);
+        AudioManager.PlayItemPickup();
 
         Debug.Log(itemName + " envantere eklendi!");
 

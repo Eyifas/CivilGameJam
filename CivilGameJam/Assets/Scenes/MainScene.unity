@@ -402,6 +402,14 @@ MonoBehaviour:
   actionLabelText: {fileID: 1157966302}
   triggerKey: 19
   actionIdentifier: exit
+  circleButtonSprite: {fileID: 0}
+  eButtonSprite: {fileID: 0}
+  outerRingSprite: {fileID: 0}
+  trackRingSprite: {fileID: 0}
+  normalRingColor: {r: 0.70980394, g: 0.7490196, b: 0.49803922, a: 1}
+  warningRingColor: {r: 0.9529412, g: 0.6117647, b: 0.07058824, a: 1}
+  dangerRingColor: {r: 0.90588236, g: 0.29803923, b: 0.23529412, a: 1}
+  trackRingColor: {r: 0.18, g: 0.2, b: 0.24, a: 0.4}
 --- !u!224 &80403274
 RectTransform:
   m_ObjectHideFlags: 0
@@ -562,6 +570,13 @@ MonoBehaviour:
   targetCanvasGroup: {fileID: 0}
   promptKeyText: {fileID: 950232005}
   progressText: {fileID: 1554592871}
+  outerRingSprite: {fileID: 0}
+  trackRingSprite: {fileID: 0}
+  circleButtonSprite: {fileID: 0}
+  eButtonSprite: {fileID: 0}
+  timerRingImage: {fileID: 0}
+  trackRingImage: {fileID: 0}
+  buttonImage: {fileID: 0}
   timePerTarget: 1.8
   requiredHits: 3
   failOnMiss: 0
@@ -870,6 +885,19 @@ MonoBehaviour:
   progressSlider: {fileID: 2057214155}
   instructionText: {fileID: 1643660229}
   timerText: {fileID: 1898375203}
+  circleContainer: {fileID: 0}
+  trackRingImage: {fileID: 0}
+  radialProgressRing: {fileID: 0}
+  centerButtonImage: {fileID: 0}
+  outerRingSprite: {fileID: 0}
+  trackRingSprite: {fileID: 0}
+  circleButtonSprite: {fileID: 0}
+  eButtonSprite: {fileID: 0}
+  trackRingColor: {r: 0.70980394, g: 0.7490196, b: 0.49803922, a: 0.25}
+  normalRingColor: {r: 0.70980394, g: 0.7490196, b: 0.49803922, a: 1}
+  warningRingColor: {r: 0.9529412, g: 0.6117647, b: 0.07058824, a: 1}
+  successRingColor: {r: 0.15294118, g: 0.68235296, b: 0.3764706, a: 1}
+  failRingColor: {r: 0.90588236, g: 0.29803923, b: 0.23529412, a: 1}
   progressPerClick: 0.08
   decayRatePerSecond: 0.25
   timeLimit: 5
@@ -2487,6 +2515,47 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!21 &722865050
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Hazard_Sprite_Unlit
+  m_Shader: {fileID: 10753, guid: 0000000000000000f000000000000000, type: 0}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _AlphaTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _MainTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - PixelSnap: 0
+    - _EnableExternalAlpha: 0
+    m_Colors:
+    - _Color: {r: 1, g: 1, b: 1, a: 1}
+    - _Flip: {r: 1, g: 1, b: 1, a: 1}
+    - _RendererColor: {r: 1, g: 1, b: 1, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1
 --- !u!1 &815651234
 GameObject:
   m_ObjectHideFlags: 0
@@ -3181,6 +3250,14 @@ MonoBehaviour:
   actionLabelText: {fileID: 1685160706}
   triggerKey: 33
   actionIdentifier: desk
+  circleButtonSprite: {fileID: 0}
+  eButtonSprite: {fileID: 0}
+  outerRingSprite: {fileID: 0}
+  trackRingSprite: {fileID: 0}
+  normalRingColor: {r: 0.70980394, g: 0.7490196, b: 0.49803922, a: 1}
+  warningRingColor: {r: 0.9529412, g: 0.6117647, b: 0.07058824, a: 1}
+  dangerRingColor: {r: 0.90588236, g: 0.29803923, b: 0.23529412, a: 1}
+  trackRingColor: {r: 0.18, g: 0.2, b: 0.24, a: 0.4}
 --- !u!1 &885441568
 GameObject:
   m_ObjectHideFlags: 0
@@ -6128,14 +6205,16 @@ MonoBehaviour:
   hasFlashlight: 0
   hasFirstAidKit: 0
   isCabinetSecured: 0
+  isDolapSecured: 0
   isGasShutOff: 0
   isBreakerShutOff: 0
+  isElectricityRestored: 0
   isPlanterMoved: 0
   isNeighborTreated: 0
   isSignDodged: 0
-  stage1Duration: 20
+  stage1Duration: 60
   stage2TremorDuration: 5
-  stage3Duration: 30
+  stage3Duration: 60
   maxRewindsPerGame: 3
   rewindsUsed: 0
   timerText: {fileID: 1075862540}
@@ -6832,7 +6911,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 9dfc825aed78fcd4ba02077103263b40, type: 2}
+  - {fileID: 722865050}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -7689,7 +7768,7 @@ SpriteRenderer:
   m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 0
+  m_SortingOrder: 1
   m_MaskInteraction: 0
   m_Sprite: {fileID: 21300000, guid: fe5b71174299044f6b82eb37d7517b4b, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}

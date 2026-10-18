@@ -79,6 +79,7 @@ public class CabinetFallController : MonoBehaviour
 
         // 4 - Tamamen yerde
         spriteRenderer.sprite = fallenSprite;
+        AudioManager.PlayCabinetCrash();
         SetPerspective(1f);
     }
 

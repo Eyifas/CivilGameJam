@@ -706,6 +706,32 @@ public class TimeRewindController : MonoBehaviour
             };
         }
 
+        // 10. Tsunami / Coastal Secondary Disaster
+        if (lower.Contains("tsunami") || lower.Contains("coast") || lower.Contains("wave"))
+        {
+            return new FormattedRewindReason
+            {
+                categoryTag = "SECONDARY DISASTER",
+                primaryTitle = "TSUNAMI INUNDATION HAZARD",
+                survivalRule = "Earthquakes in coastal areas trigger giant tsunamis within minutes — move to high ground immediately!",
+                tagColor = new Color(0.3f, 0.7f, 1f, 1f),
+                titleColor = new Color(0.4f, 0.85f, 1f, 1f)
+            };
+        }
+
+        // 11. Building Collapse (After-effect / stayed in apartment)
+        if (lower.Contains("building collapse") || lower.Contains("structural") || lower.Contains("damaged apartment") || lower.Contains("collapsed") || lower.Contains("lingered inside"))
+        {
+            return new FormattedRewindReason
+            {
+                categoryTag = "AFTERSHOCK HAZARD",
+                primaryTitle = "BUILDING COLLAPSED",
+                survivalRule = "Damaged buildings can collapse at any moment — evacuate immediately after shutting off utilities!",
+                tagColor = new Color(1f, 0.45f, 0.2f, 1f),
+                titleColor = new Color(1f, 0.55f, 0.25f, 1f)
+            };
+        }
+
         // Fallback: Smart Split
         string[] parts = rawReason.Split(new char[] { ':', '!' }, StringSplitOptions.RemoveEmptyEntries);
         string cat = "CAUSE OF DEATH";

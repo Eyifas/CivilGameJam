@@ -170,6 +170,28 @@ public class InteractionZone : MonoBehaviour
         if (IsPipeZone() && GameTimelineManager.Instance.IsGasShutOff)
             return true;
 
+        if (IsDolapZone() && GameTimelineManager.Instance.IsDolapSecured)
+            return true;
+
+        return false;
+    }
+
+    public bool IsDolapZone()
+    {
+        // Strictly matches the hallway wardrobe before the exit door (DolapScene / düşme dolap)
+        // NEVER matches the kitchen cupboard (CupboardScene / dolap mutfak)
+        if (!string.IsNullOrEmpty(sceneName) && sceneName.Equals("DolapScene", System.StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        if (transform.parent != null && 
+            (transform.parent.name.IndexOf("düşme", System.StringComparison.OrdinalIgnoreCase) >= 0 ||
+             transform.parent.name.IndexOf("dsme", System.StringComparison.OrdinalIgnoreCase) >= 0))
+            return true;
+
+        if (name.IndexOf("düşme", System.StringComparison.OrdinalIgnoreCase) >= 0 ||
+            name.IndexOf("dsme", System.StringComparison.OrdinalIgnoreCase) >= 0)
+            return true;
+
         return false;
     }
 
@@ -323,6 +345,7 @@ public class InteractionZone : MonoBehaviour
             if (sceneName.IndexOf("Bookshelf", System.StringComparison.OrdinalIgnoreCase) >= 0) return "Anchor Bookshelf";
             if (sceneName.IndexOf("Table", System.StringComparison.OrdinalIgnoreCase) >= 0) return "Secure Desk";
             if (sceneName.IndexOf("Pipe", System.StringComparison.OrdinalIgnoreCase) >= 0) return "Shut Off Gas";
+            if (sceneName.Equals("DolapScene", System.StringComparison.OrdinalIgnoreCase)) return "Lift Wardrobe";
             return sceneName;
         }
         if (transform.parent != null)
@@ -331,6 +354,11 @@ public class InteractionZone : MonoBehaviour
                 transform.parent.name.IndexOf("vana", System.StringComparison.OrdinalIgnoreCase) >= 0 ||
                 transform.parent.name.IndexOf("pipe", System.StringComparison.OrdinalIgnoreCase) >= 0)
                 return "Shut Off Gas";
+
+            if (transform.parent.name.IndexOf("düşme", System.StringComparison.OrdinalIgnoreCase) >= 0 ||
+                transform.parent.name.IndexOf("dsme", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                return "Lift Wardrobe";
+
             return transform.parent.name;
         }
         return "Interact";
@@ -346,6 +374,12 @@ public class InteractionZone : MonoBehaviour
         {
             // Kitchen gas pipe is ONLY interactable after the earthquake during Stage 3 Utilities (until gas is shut off)
             return stage == GameStage.Stage3_Utilities && !GameTimelineManager.Instance.IsGasShutOff;
+        }
+
+        if (IsDolapZone())
+        {
+            // Hallway wardrobe before exit door is ONLY interactable after the earthquake during Stage 3 Utilities (until lifted)
+            return stage == GameStage.Stage3_Utilities && !GameTimelineManager.Instance.IsDolapSecured;
         }
 
         // Room preparation zones (Drawer, Bookshelf, Table/Painting) are only interactable during Stage 1 Preparation
