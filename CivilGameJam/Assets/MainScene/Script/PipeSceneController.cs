@@ -88,6 +88,7 @@ public class PipeSceneController : MonoBehaviour
     private Image sliderFillImage;
     private GameObject successBannerObj;
     private TMP_Text successBannerText;
+    private InteractionVisualCue turnValveCue;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void OnRuntimeSceneLoaded()
@@ -148,6 +149,21 @@ public class PipeSceneController : MonoBehaviour
         {
             SetAlreadyShutOffState();
             return;
+        }
+
+        // Animated turn cue with counter-clockwise arrow
+        if (!isValveShut && overlayCanvas != null)
+        {
+            Vector3 cuePos = boltWorldPos + new Vector3(0.5f, 2.5f, 0f);
+            turnValveCue = InteractionVisualCue.CreateTurnCue(
+                overlayCanvas.transform,
+                cuePos,
+                false, // counter-clockwise turn
+                "TURN",
+                "Counter-Clockwise to Close",
+                new Vector2(0f, 60f),
+                sceneCamera
+            );
         }
 
         // Play initial gas hissing
@@ -874,6 +890,12 @@ public class PipeSceneController : MonoBehaviour
         UpdateHandleRotation();
         UpdateArcColors();
 
+        if (turnValveCue != null)
+        {
+            turnValveCue.Dismiss();
+            turnValveCue = null;
+        }
+
         // Stop hissing audio immediately
         if (hissAudioSource != null)
         {
@@ -945,6 +967,12 @@ public class PipeSceneController : MonoBehaviour
         currentAngle = 180f;
         UpdateHandleRotation();
         UpdateArcColors();
+
+        if (turnValveCue != null)
+        {
+            turnValveCue.Dismiss();
+            turnValveCue = null;
+        }
 
         if (hissAudioSource != null) hissAudioSource.Stop();
         if (gasParticleSystem != null)

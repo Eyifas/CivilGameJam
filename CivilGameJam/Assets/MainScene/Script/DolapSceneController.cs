@@ -47,6 +47,7 @@ public class DolapSceneController : MonoBehaviour
     private float phase2Progress = 0.05f;
     private bool isMouseHoldingS = false;
     private bool isEnding = false;
+    private InteractionVisualCue liftCue;
 
     // UI Elements
     private Canvas overlayCanvas;
@@ -118,6 +119,19 @@ public class DolapSceneController : MonoBehaviour
     {
         UpdateDolapVisuals();
         UpdateUIFeedback();
+
+        if (overlayCanvas != null)
+        {
+            liftCue = InteractionVisualCue.CreateClickCue(
+                overlayCanvas.transform,
+                dolapBasePos + new Vector3(0f, 1.8f, 0f),
+                "MASH [S] TO LIFT",
+                "Leverage up from floor",
+                false, // points up
+                new Vector2(0f, 80f),
+                Camera.main
+            );
+        }
     }
 
     private void LoadAllSprites()
@@ -803,6 +817,11 @@ public class DolapSceneController : MonoBehaviour
         PlayAudio(sfxLatch, 1.0f);
         currentPhase = QTEPhase.Phase2_HoldS_MashW;
 
+        if (liftCue != null)
+        {
+            liftCue.UpdateText("HEAVE UPRIGHT", "Hold [S] & Mash [W]");
+        }
+
         if (headerTitleText != null)
         {
             headerTitleText.text = "<color=#2ECC71>GRIP SECURED!</color> NOW HOLD [S] & MASH [W]!";
@@ -986,6 +1005,12 @@ public class DolapSceneController : MonoBehaviour
     {
         isEnding = true;
         currentPhase = QTEPhase.Completed;
+
+        if (liftCue != null)
+        {
+            liftCue.Dismiss();
+            liftCue = null;
+        }
 
         UpdateDolapVisuals();
         PlayAudio(sfxVictory, 1.0f);

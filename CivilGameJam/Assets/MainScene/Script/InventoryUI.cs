@@ -276,6 +276,35 @@ public class InventoryUI : MonoBehaviour
         RectTransform rt = dragGhost.GetComponent<RectTransform>();
         rt.sizeDelta = new Vector2(90f, 90f);
 
+        // Visual Guidance Badge under dragged item
+        var labelObj = new GameObject("DragLabel");
+        labelObj.transform.SetParent(dragGhost.transform, false);
+        var lRect = labelObj.AddComponent<RectTransform>();
+        lRect.anchorMin = new Vector2(0.5f, 0f);
+        lRect.anchorMax = new Vector2(0.5f, 0f);
+        lRect.pivot = new Vector2(0.5f, 1f);
+        lRect.anchoredPosition = new Vector2(0f, -8f);
+        lRect.sizeDelta = new Vector2(160f, 28f);
+
+        var bg = labelObj.AddComponent<Image>();
+        bg.sprite = InteractionVisualCue.GetPillBadgeSprite();
+        bg.color = new Color(0.08f, 0.08f, 0.12f, 0.92f);
+        bg.raycastTarget = false;
+
+        var textObj = new GameObject("Text");
+        textObj.transform.SetParent(labelObj.transform, false);
+        var tRect = textObj.AddComponent<RectTransform>();
+        tRect.anchorMin = Vector2.zero;
+        tRect.anchorMax = Vector2.one;
+        tRect.sizeDelta = Vector2.zero;
+        var txt = textObj.AddComponent<TMPro.TextMeshProUGUI>();
+        txt.fontSize = 13f;
+        txt.fontStyle = TMPro.FontStyles.Bold;
+        txt.alignment = TMPro.TextAlignmentOptions.Center;
+        txt.color = new Color(1f, 0.85f, 0.25f, 1f);
+        txt.text = "DROP ON TARGET";
+        txt.raycastTarget = false;
+
         dragGhost.SetActive(false);
     }
 

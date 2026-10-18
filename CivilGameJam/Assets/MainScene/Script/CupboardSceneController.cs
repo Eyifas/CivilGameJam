@@ -80,6 +80,7 @@ public class CupboardSceneController : MonoBehaviour
     private Image sliderFillImage;
     private RectTransform keyBadgeRect;
     private TMP_Text resultBannerText;
+    private InteractionVisualCue pushCue;
 
     // Circular Hand-Drawn QTE Widget
     private RectTransform circleContainer;
@@ -404,6 +405,19 @@ public class CupboardSceneController : MonoBehaviour
         timeRemaining = qteDuration;
         isQTEActive = true;
 
+        if (overlayCanvas != null)
+        {
+            pushCue = InteractionVisualCue.CreateClickCue(
+                overlayCanvas.transform,
+                Vector3.zero,
+                "MASH TO PUSH",
+                "Secure cabinet door",
+                false, // points up
+                new Vector2(0f, 130f),
+                mainCamera
+            );
+        }
+
         if (headerText != null) headerText.text = "<color=#FF4444>THE CABINET DOOR IS FALLING!</color>";
         if (promptText != null) promptText.text = "RAPIDLY MASH [SPACE] OR [E] TO PUSH IT AWAY!";
         if (mashSlider != null) mashSlider.gameObject.SetActive(true);
@@ -415,6 +429,11 @@ public class CupboardSceneController : MonoBehaviour
     private void OnQTESucceeded()
     {
         isQTEActive = false;
+        if (pushCue != null)
+        {
+            pushCue.Dismiss();
+            pushCue = null;
+        }
         StartCoroutine(SuccessRoutine());
     }
 
@@ -461,6 +480,11 @@ public class CupboardSceneController : MonoBehaviour
     private void OnQTEFailed()
     {
         isQTEActive = false;
+        if (pushCue != null)
+        {
+            pushCue.Dismiss();
+            pushCue = null;
+        }
         StartCoroutine(FailureRoutine());
     }
 

@@ -85,6 +85,10 @@ public class DoorSceneController : MonoBehaviour
     private GameObject successBannerObj;
     private TMP_Text successBannerText;
 
+    // Visual Guidance Cues
+    private InteractionVisualCue dragKeyCue;
+    private InteractionVisualCue turnKeyCue;
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void OnSceneLoadedRuntime()
     {
@@ -145,6 +149,20 @@ public class DoorSceneController : MonoBehaviour
     {
         UpdateInstruction();
         UpdateProgressUI();
+
+        // Visual cue for dragging key from inventory to keyhole
+        if (!isKeyInserted && doorCanvas != null)
+        {
+            dragKeyCue = InteractionVisualCue.CreateDragAndDropCue(
+                doorCanvas.transform,
+                keyholeWorldPos,
+                new Vector2(170f, 170f),
+                "DRAG KEY HERE",
+                "From inventory to keyhole",
+                new Vector2(0f, 95f),
+                sceneCamera
+            );
+        }
     }
 
     private void OnDestroy()
@@ -592,6 +610,26 @@ public class DoorSceneController : MonoBehaviour
         AudioManager.PlayValveLatch();
         AudioManager.PlayItemPickup();
 
+        // Dismiss drag cue and show animated clockwise turn cue
+        if (dragKeyCue != null)
+        {
+            dragKeyCue.Dismiss();
+            dragKeyCue = null;
+        }
+
+        if (turnKeyCue == null && doorCanvas != null)
+        {
+            turnKeyCue = InteractionVisualCue.CreateTurnCue(
+                doorCanvas.transform,
+                keyholeWorldPos,
+                true, // clockwise
+                "TURN",
+                "Clockwise 360°",
+                new Vector2(170f, 40f),
+                sceneCamera
+            );
+        }
+
         Debug.Log("<color=green>[DoorScene] Key inserted into the keyhole!</color>");
         UpdateInstruction("<b>Key inserted!</b> Rotate the key clockwise: drag mouse around keyhole or hold [D] / [Right Arrow].");
         UpdateProgressUI();
@@ -714,6 +752,8 @@ public class DoorSceneController : MonoBehaviour
         AudioManager.PlayDolapStrain();
         AudioManager.PlayDoorLocked();
 
+        if (turnKeyCue != null) turnKeyCue.SetVisible(false);
+
         if (qtePanelObj != null)
         {
             qtePanelObj.SetActive(true);
@@ -780,6 +820,7 @@ public class DoorSceneController : MonoBehaviour
         tumblerPassed[currentTumblerIndex] = true;
         isTumblerCatchActive = false;
         if (qtePanelObj != null) qtePanelObj.SetActive(false);
+        if (turnKeyCue != null) turnKeyCue.SetVisible(true);
 
         AudioManager.PlayQTEHit();
         AudioManager.PlayValveLatch();
@@ -792,6 +833,7 @@ public class DoorSceneController : MonoBehaviour
     {
         isTumblerCatchActive = false;
         if (qtePanelObj != null) qtePanelObj.SetActive(false);
+        if (turnKeyCue != null) turnKeyCue.SetVisible(true);
 
         AudioManager.PlaySFX(SFXType.QTEMiss);
 
@@ -872,6 +914,18 @@ public class DoorSceneController : MonoBehaviour
         isUnlocked = true;
         isEvacuating = true;
         if (qtePanelObj != null) qtePanelObj.SetActive(false);
+
+        if (turnKeyCue != null)
+        {
+            turnKeyCue.Dismiss();
+            turnKeyCue = null;
+        }
+
+        if (dragKeyCue != null)
+        {
+            dragKeyCue.Dismiss();
+            dragKeyCue = null;
+        }
 
         AudioManager.PlayDoorOpen();
         AudioManager.PlayValveLatch();

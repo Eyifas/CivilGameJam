@@ -54,6 +54,10 @@ public class TableSceneController : MonoBehaviour
     private string currentInstruction = "";
     private Coroutine loweringCoroutine = null;
 
+    // Visual Guidance Cues
+    private InteractionVisualCue candleCue;
+    private InteractionVisualCue paintingCue;
+
     private void Awake()
     {
         Instance = this;
@@ -171,6 +175,38 @@ public class TableSceneController : MonoBehaviour
         }
 
         UpdateInstruction("Click the candle to extinguish flame | Hold & release in GREEN to lower painting!");
+
+        var canvas = FindFirstObjectByType<Canvas>();
+        if (canvas != null)
+        {
+            if (!candleExtinguished)
+            {
+                Vector3 candlePos = candleFlame != null ? candleFlame.transform.position : new Vector3(-2.8f, -0.6f, 0f);
+                candleCue = InteractionVisualCue.CreateClickCue(
+                    canvas.transform,
+                    candlePos,
+                    "CLICK",
+                    "Extinguish flame",
+                    true,
+                    new Vector2(0f, 85f),
+                    Camera.main
+                );
+            }
+
+            if (!paintingSafe)
+            {
+                Vector3 paintPos = paintingTransform != null ? paintingTransform.position : new Vector3(-0.06f, 3.15f, 0f);
+                paintingCue = InteractionVisualCue.CreateClickCue(
+                    canvas.transform,
+                    paintPos,
+                    "HOLD & RELEASE",
+                    "Lower safely to floor",
+                    true,
+                    new Vector2(0f, -85f),
+                    Camera.main
+                );
+            }
+        }
     }
 
     private void SetTableVisuals(bool extinguished)
@@ -223,6 +259,13 @@ public class TableSceneController : MonoBehaviour
         if (candleExtinguished) return;
 
         candleExtinguished = true;
+
+        if (candleCue != null)
+        {
+            candleCue.Dismiss();
+            candleCue = null;
+        }
+
         AudioManager.PlayCandlePuff();
         SetTableVisuals(true);
 
@@ -331,6 +374,12 @@ public class TableSceneController : MonoBehaviour
             paintingSafe = true;
             currentCharge = 0f;
 
+            if (paintingCue != null)
+            {
+                paintingCue.Dismiss();
+                paintingCue = null;
+            }
+
             if (GameTimelineManager.Instance != null)
             {
                 GameTimelineManager.Instance.SetPaintingRemoved(true);
@@ -411,6 +460,9 @@ public class TableSceneController : MonoBehaviour
 
     private void CheckBothCompleted()
     {
+        if (candleCue != null) { candleCue.Dismiss(); candleCue = null; }
+        if (paintingCue != null) { paintingCue.Dismiss(); paintingCue = null; }
+
         if (candleExtinguished && paintingSafe)
         {
             isTransitioningBack = true;

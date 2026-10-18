@@ -44,6 +44,10 @@ public class BookshelfSceneController : MonoBehaviour
     private bool areToolsPlaced = false;
     private string currentInstruction = "";
 
+    // Visual Guidance Cues
+    private InteractionVisualCue dragToolsCue;
+    private InteractionVisualCue hammerTargetCue;
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetStatics()
     {
@@ -145,6 +149,20 @@ public class BookshelfSceneController : MonoBehaviour
         }
 
         UpdateInstruction("Drag the Hammer and Nails from your inventory onto the top of the bookshelf!");
+
+        var canvas = FindFirstObjectByType<Canvas>();
+        if (canvas != null && !areToolsPlaced)
+        {
+            dragToolsCue = InteractionVisualCue.CreateDragAndDropCue(
+                canvas.transform,
+                (Vector3)dropZoneCenter,
+                new Vector2(360f, 160f),
+                "DRAG TOOLS HERE",
+                "Hammer & Nails from inventory",
+                new Vector2(0f, 95f),
+                Camera.main
+            );
+        }
     }
 
     private void Update()
@@ -204,6 +222,7 @@ public class BookshelfSceneController : MonoBehaviour
             }
             else
             {
+                if (dragToolsCue != null) dragToolsCue.UpdateText("DRAG NAILS HERE", "From inventory");
                 UpdateInstruction("<color=green>Hammer placed on the bookshelf!</color> Now drag the Nails from your inventory.");
             }
             return true;
@@ -230,6 +249,7 @@ public class BookshelfSceneController : MonoBehaviour
             }
             else
             {
+                if (dragToolsCue != null) dragToolsCue.UpdateText("DRAG HAMMER HERE", "From inventory");
                 UpdateInstruction("<color=green>Nails placed on the bookshelf!</color> Now drag the Hammer from your inventory.");
             }
             return true;
@@ -298,6 +318,12 @@ public class BookshelfSceneController : MonoBehaviour
     private void OnBothToolsPlaced()
     {
         areToolsPlaced = true;
+        if (dragToolsCue != null)
+        {
+            dragToolsCue.Dismiss();
+            dragToolsCue = null;
+        }
+
         UpdateInstruction("<color=green>Both tools placed on the bookshelf! Starting anchoring...</color>");
         StartCoroutine(StartQTEAfterToolsPlacedRoutine());
     }
@@ -314,6 +340,26 @@ public class BookshelfSceneController : MonoBehaviour
     public void StartAnchoring()
     {
         if (isAnchored || isQTERunning) return;
+
+        if (dragToolsCue != null)
+        {
+            dragToolsCue.Dismiss();
+            dragToolsCue = null;
+        }
+
+        var canvas = FindFirstObjectByType<Canvas>();
+        if (canvas != null && hammerTargetCue == null)
+        {
+            hammerTargetCue = InteractionVisualCue.CreateClickCue(
+                canvas.transform,
+                (Vector3)dropZoneCenter,
+                "CLICK TARGETS",
+                "Hammer the brackets!",
+                true,
+                new Vector2(0f, 95f),
+                Camera.main
+            );
+        }
 
         if (anchorPromptButton != null)
         {
@@ -357,6 +403,18 @@ public class BookshelfSceneController : MonoBehaviour
         isAnchored = true;
         isQTERunning = false;
 
+        if (dragToolsCue != null)
+        {
+            dragToolsCue.Dismiss();
+            dragToolsCue = null;
+        }
+
+        if (hammerTargetCue != null)
+        {
+            hammerTargetCue.Dismiss();
+            hammerTargetCue = null;
+        }
+
         // Permanently remove Hammer and Nails/Vida from inventory upon successful use!
         InventoryManager.RemoveItem("Hammer");
         InventoryManager.RemoveItem("Vida");
@@ -395,6 +453,12 @@ public class BookshelfSceneController : MonoBehaviour
     private void OnAnchoringFail()
     {
         isQTERunning = false;
+        if (hammerTargetCue != null)
+        {
+            hammerTargetCue.Dismiss();
+            hammerTargetCue = null;
+        }
+
         UpdateInstruction("<color=red>Failed to secure brackets in time! Click or press SPACE to try again.</color>");
 
         if (anchorPromptButton != null)
@@ -407,6 +471,19 @@ public class BookshelfSceneController : MonoBehaviour
     {
         isAnchored = true;
         isQTERunning = false;
+
+        if (dragToolsCue != null)
+        {
+            dragToolsCue.Dismiss();
+            dragToolsCue = null;
+        }
+
+        if (hammerTargetCue != null)
+        {
+            hammerTargetCue.Dismiss();
+            hammerTargetCue = null;
+        }
+
         if (visualBracketsSecured != null) visualBracketsSecured.SetActive(true);
         if (anchorPromptButton != null) anchorPromptButton.SetActive(false);
         UpdateInstruction("<color=green>Bookshelf is already safely anchored! Returning...</color>");

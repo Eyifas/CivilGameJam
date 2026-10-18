@@ -16,6 +16,7 @@ public class DrawerController : MonoBehaviour
 
     private bool leftOpen = false;
     private bool rightOpen = false;
+    private InteractionVisualCue drawerCue;
 
     private void Awake()
     {
@@ -48,6 +49,20 @@ public class DrawerController : MonoBehaviour
     {
         UpdateItems();
         TodoListUI.RegisterDrawerChecked();
+
+        var canvas = FindFirstObjectByType<Canvas>();
+        if (canvas != null)
+        {
+            drawerCue = InteractionVisualCue.CreateClickCue(
+                canvas.transform,
+                transform.position + new Vector3(0f, 1.2f, 0f),
+                "CLICK DRAWERS",
+                "Open & search drawers",
+                true,
+                new Vector2(0f, 110f),
+                Camera.main
+            );
+        }
     }
 
     public void ToggleLeftDrawer()
@@ -146,6 +161,29 @@ public class DrawerController : MonoBehaviour
             else
             {
                 anahtarObject.SetActive(leftOpen);
+            }
+        }
+
+        // Update guidance cue
+        bool hasVisibleItems = (hammerObject != null && hammerObject.activeSelf) ||
+                               (vidaObject != null && vidaObject.activeSelf) ||
+                               (flashlightObject != null && flashlightObject.activeSelf) ||
+                               (anahtarObject != null && anahtarObject.activeSelf);
+
+        if (drawerCue != null)
+        {
+            if (hasVisibleItems)
+            {
+                drawerCue.UpdateText("CLICK ITEM", "Take into inventory");
+            }
+            else if (!leftOpen && !rightOpen)
+            {
+                drawerCue.UpdateText("CLICK DRAWERS", "Open & search drawers");
+            }
+            else
+            {
+                drawerCue.Dismiss();
+                drawerCue = null;
             }
         }
     }
