@@ -52,33 +52,54 @@ public class SwitchInteraction : MonoBehaviour
 
     public static bool IsAnyHazardActive { get; set; } = false;
 
-    private static Material s_unlitMaterial;
-    public static Material GetUnlitMaterial()
+    private static Material s_unlitArtworkMaterial;
+    private static Material s_unlitBackdropMaterial;
+
+    public static Material GetUnlitArtworkMaterial()
     {
-        if (s_unlitMaterial != null) return s_unlitMaterial;
+        if (s_unlitArtworkMaterial != null) return s_unlitArtworkMaterial;
+        s_unlitArtworkMaterial = CreateUnlitSpriteMaterial("Hazard_Artwork_Unlit", Color.white);
+        return s_unlitArtworkMaterial;
+    }
 
-        Shader shader = Shader.Find("Universal Render Pipeline/2D/Sprite-Unlit");
-        if (shader == null) shader = Shader.Find("Sprites/Default");
+    public static Material GetUnlitBackdropMaterial()
+    {
+        if (s_unlitBackdropMaterial != null) return s_unlitBackdropMaterial;
+        s_unlitBackdropMaterial = CreateUnlitSpriteMaterial("Hazard_Backdrop_Unlit", Color.black);
+        return s_unlitBackdropMaterial;
+    }
+
+    public static Material GetUnlitMaterial() => GetUnlitArtworkMaterial();
+
+    private static Material CreateUnlitSpriteMaterial(string matName, Color tintColor)
+    {
+        Shader shader = Shader.Find("Universal Render Pipeline/2D/Sprite-Unlit-Default");
+        if (shader == null) shader = Shader.Find("Universal Render Pipeline/2D/Sprite-Unlit");
         if (shader == null) shader = Shader.Find("Universal Render Pipeline/Unlit");
-        if (shader == null) shader = Shader.Find("Unlit/Texture");
 
-        if (shader != null)
-        {
-            s_unlitMaterial = new Material(shader);
-            s_unlitMaterial.name = "Hazard_Sprite_Unlit";
-        }
 #if UNITY_EDITOR
-        if (s_unlitMaterial == null)
+        if (shader == null)
         {
-            string unlitPath = UnityEditor.AssetDatabase.GUIDToAssetPath("9dfc825aed78fcd4ba02077103263b40");
-            if (!string.IsNullOrEmpty(unlitPath))
+            var sourceMat = UnityEditor.AssetDatabase.LoadAssetAtPath<Material>("Packages/com.unity.render-pipelines.universal/Runtime/Materials/Sprite-Unlit-Default.mat");
+            if (sourceMat != null)
             {
-                var mat = UnityEditor.AssetDatabase.LoadAssetAtPath<Material>(unlitPath);
-                if (mat != null) s_unlitMaterial = new Material(mat);
+                var copy = new Material(sourceMat);
+                copy.name = matName;
+                copy.color = tintColor;
+                return copy;
             }
         }
 #endif
-        return s_unlitMaterial;
+
+        if (shader != null)
+        {
+            var mat = new Material(shader);
+            mat.name = matName;
+            mat.color = tintColor;
+            return mat;
+        }
+
+        return null;
     }
 
     public bool IsTriggered => triggered;
@@ -293,7 +314,8 @@ public class SwitchInteraction : MonoBehaviour
     {
         if (obj == null) return;
 
-        var unlitMat = GetUnlitMaterial();
+        var artworkMat = GetUnlitArtworkMaterial();
+        var backdropMat = GetUnlitBackdropMaterial();
 
         // 1. SpriteRenderers
         var spriteRenderers = obj.GetComponentsInChildren<SpriteRenderer>(true);
@@ -306,17 +328,15 @@ public class SwitchInteraction : MonoBehaviour
 
             if (sr.gameObject.name == "Backdrop")
             {
-                sr.sortingOrder = sortingOrder - 1; // Always 19, strictly behind the comic panel!
+                sr.sortingOrder = sortingOrder - 2; // Always 18, strictly behind the comic panel (20)
+                sr.color = Color.black;
+                if (backdropMat != null) sr.sharedMaterial = backdropMat;
             }
             else
             {
                 sr.sortingOrder = sortingOrder; // 20
-            }
-
-            // Make sure the hazard visual is 100% unlit (full bright independent of room lighting / cut power)
-            if (unlitMat != null)
-            {
-                sr.material = unlitMat;
+                sr.color = Color.white;
+                if (artworkMat != null) sr.sharedMaterial = artworkMat;
             }
         }
 
@@ -342,6 +362,17 @@ public class SwitchInteraction : MonoBehaviour
                 canvas.sortingLayerName = sortingLayerName;
             }
             canvas.sortingOrder = sortingOrder;
+        }
+
+        // 4. TextMeshPro components (for placeholders)
+        var tmps = obj.GetComponentsInChildren<TMPro.TextMeshPro>(true);
+        foreach (var tmp in tmps)
+        {
+            if (!string.IsNullOrEmpty(sortingLayerName))
+            {
+                tmp.sortingLayerID = SortingLayer.NameToID(sortingLayerName);
+            }
+            tmp.sortingOrder = sortingOrder + 2; // 22, always visible in front
         }
 
         // 4. SortingGroups
@@ -540,75 +571,67 @@ public class SwitchInteraction : MonoBehaviour
         }
     }
 
+    public void HideVisual()
+    {
+        if (switchImage != null)
+        {
+            switchImage.SetActive(false);
+        }
+        triggered = false;
+        IsAnyHazardActive = false;
+    }
+
     /// <summary>
     /// Programmatically triggers the death sequence (for automatic events like candle fire or falling painting).
     /// </summary>
     public void TriggerSequence()
     {
         if (triggered) return;
-        triggered = true;
-        IsAnyHazardActive = true;
-
-        if (GameTimelineManager.Instance != null)
-        {
-            GameTimelineManager.Instance.TriggerRewind(educationalReason);
-        }
-        else if (HazardVisualManager.Instance != null)
-        {
-            HazardVisualManager.Instance.ShowHazardVisual(educationalReason, () =>
-            {
-                if (TimeRewindController.Instance != null)
-                {
-                    TimeRewindController.Instance.PlayTimeRewind(educationalReason, rewindDuration, () => {}, () => { triggered = false; IsAnyHazardActive = false; });
-                }
-            });
-        }
+        StartCoroutine(SwitchDeathSequence(educationalReason, rewindDuration, imageDuration));
     }
 
     /// <summary>
     /// Programmatically triggers the death sequence with custom message, rewind duration, and display time.
     /// </summary>
-    public void TriggerSequence(string customReason, float customRewindDuration, float customImageDuration = 1.5f)
+    public void TriggerSequence(string customReason, float customRewindDuration, float customImageDuration = 2.2f, Action onDone = null)
     {
         if (triggered) return;
-        triggered = true;
-        IsAnyHazardActive = true;
-
-        if (GameTimelineManager.Instance != null)
-        {
-            GameTimelineManager.Instance.TriggerRewind(customReason);
-        }
-        else if (HazardVisualManager.Instance != null)
-        {
-            HazardVisualManager.Instance.ShowHazardVisual(customReason, () =>
-            {
-                if (TimeRewindController.Instance != null)
-                {
-                    TimeRewindController.Instance.PlayTimeRewind(customReason, customRewindDuration, () => {}, () => { triggered = false; IsAnyHazardActive = false; });
-                }
-            });
-        }
+        StartCoroutine(SwitchDeathSequence(customReason, customRewindDuration, customImageDuration, onDone));
     }
 
     /// <summary>
     /// Static one-liner to play any death visual from anywhere:
     /// SwitchInteraction.PlayHazardDeathVisual(fireImage, "APARTMENT FIRE...", 15f);
     /// </summary>
-    public static void PlayHazardDeathVisual(GameObject imageObj, string reason, float rewindSeconds = 5f, float holdDuration = 1.5f, int order = 20)
+    public static void PlayHazardDeathVisual(GameObject imageObj, string reason, float rewindSeconds = 5f, float holdDuration = 2.2f, int order = 20)
     {
-        if (GameTimelineManager.Instance != null)
+        if (imageObj != null)
         {
-            GameTimelineManager.Instance.TriggerRewind(reason);
-        }
-        else if (HazardVisualManager.Instance != null)
-        {
-            HazardVisualManager.Instance.ShowHazardVisual(reason, () =>
+            var comp = imageObj.GetComponent<SwitchInteraction>();
+            if (comp == null)
             {
-                if (TimeRewindController.Instance != null)
-                {
-                    TimeRewindController.Instance.PlayTimeRewind(reason, rewindSeconds, () => {}, () => {});
-                }
-            });
+                comp = imageObj.AddComponent<SwitchInteraction>();
+                comp.switchImage = imageObj;
+                comp.triggerOnInteract = false;
+                comp.sortingOrder = order;
+            }
+            comp.TriggerSequence(reason, rewindSeconds, holdDuration);
+        }
+        else
+        {
+            if (HazardVisualManager.Instance != null && HazardVisualManager.Instance.TriggerHazard(reason))
+            {
+                return;
+            }
+
+            if (GameTimelineManager.Instance != null)
+            {
+                GameTimelineManager.Instance.TriggerRewind(reason);
+            }
+            else if (TimeRewindController.Instance != null)
+            {
+                TimeRewindController.Instance.PlayTimeRewind(reason, rewindSeconds, () => {}, () => {});
+            }
         }
     }
 
@@ -627,38 +650,145 @@ public class SwitchInteraction : MonoBehaviour
 
     private void FitVisualToCamera(GameObject obj, Camera cam)
     {
-        var sr = obj.GetComponent<SpriteRenderer>();
-        if (sr != null && sr.sprite != null && cam.orthographic)
+        if (obj == null || cam == null) return;
+
+        float camHeight, camWidth;
+        if (cam.orthographic)
         {
-            float camHeight = cam.orthographicSize * 2f;
-            float camWidth = camHeight * cam.aspect;
+            camHeight = cam.orthographicSize * 2f;
+            camWidth = camHeight * cam.aspect;
+        }
+        else
+        {
+            float dist = Mathf.Abs(cam.transform.position.z - obj.transform.position.z);
+            camHeight = 2.0f * dist * Mathf.Tan(cam.fieldOfView * 0.5f * Mathf.Deg2Rad);
+            camWidth = camHeight * cam.aspect;
+        }
+
+        // Coverage with 50% safety margin so absolutely no room/apartment pixels bleed through
+        float targetWorldW = camWidth * 1.5f;
+        float targetWorldH = camHeight * 1.5f;
+
+        var sr = obj.GetComponent<SpriteRenderer>();
+        var backdrop = obj.transform.Find("Backdrop");
+        var placeholder = obj.transform.Find("PlaceholderLabel") ?? obj.transform.Find("TempLabel");
+
+        var bdSr = backdrop != null ? backdrop.GetComponent<SpriteRenderer>() : null;
+        float bdUnitW = (bdSr != null && bdSr.sprite != null) ? (bdSr.sprite.rect.width / bdSr.sprite.pixelsPerUnit) : 2f;
+        float bdUnitH = (bdSr != null && bdSr.sprite != null) ? (bdSr.sprite.rect.height / bdSr.sprite.pixelsPerUnit) : 2f;
+        if (bdUnitW < 0.001f) bdUnitW = 2f;
+        if (bdUnitH < 0.001f) bdUnitH = 2f;
+
+        if (sr != null && sr.sprite != null)
+        {
             float spriteW = sr.sprite.rect.width / sr.sprite.pixelsPerUnit;
             float spriteH = sr.sprite.rect.height / sr.sprite.pixelsPerUnit;
 
             if (spriteW > 0.001f && spriteH > 0.001f)
             {
-                // Fit nicely within camera viewport preserving aspect ratio
+                // Fit comic panel nicely inside camera viewport preserving its exact aspect ratio
                 float scale = Mathf.Min(camHeight / spriteH, camWidth / spriteW);
                 obj.transform.localScale = new Vector3(scale, scale, 1f);
+                sr.enabled = true;
+                sr.color = Color.white;
 
-                // Adjust Backdrop scale so it covers entire camera screen behind this scaled sprite
-                var backdrop = obj.transform.Find("Backdrop");
+                // Black underlay fills the entire screen behind the artwork
                 if (backdrop != null)
                 {
-                    float bdW = (camWidth * 1.5f) / scale;
-                    float bdH = (camHeight * 1.5f) / scale;
-                    backdrop.localScale = new Vector3(bdW, bdH, 1f);
-                    backdrop.localPosition = new Vector3(0f, 0f, 0.05f);
+                    float bdLocalScaleX = targetWorldW / (scale * bdUnitW);
+                    float bdLocalScaleY = targetWorldH / (scale * bdUnitH);
+                    backdrop.localScale = new Vector3(bdLocalScaleX, bdLocalScaleY, 1f);
+                    backdrop.localPosition = new Vector3(0f, 0f, 0.5f);
+                    backdrop.gameObject.SetActive(true);
                 }
+
+                if (placeholder != null)
+                {
+                    placeholder.gameObject.SetActive(false);
+                }
+                return;
             }
+        }
+
+        // Placeholder fallback: artwork not yet added
+        if (sr != null)
+        {
+            sr.enabled = false;
+        }
+        obj.transform.localScale = Vector3.one;
+
+        if (backdrop != null)
+        {
+            float bdLocalScaleX = targetWorldW / bdUnitW;
+            float bdLocalScaleY = targetWorldH / bdUnitH;
+            backdrop.localScale = new Vector3(bdLocalScaleX, bdLocalScaleY, 1f);
+            backdrop.localPosition = new Vector3(0f, 0f, 0.5f);
+            backdrop.gameObject.SetActive(true);
+        }
+
+        if (placeholder != null)
+        {
+            placeholder.gameObject.SetActive(true);
+            placeholder.localPosition = new Vector3(0f, 0f, -0.2f);
+            placeholder.localScale = Vector3.one;
         }
     }
 
-    private IEnumerator SwitchDeathSequence(string reason, float rewindSeconds, float holdDuration)
+    private void PlayHazardSound(string reason)
+    {
+        if (string.IsNullOrEmpty(reason))
+        {
+            AudioManager.PlayExplosion();
+            return;
+        }
+
+        if (reason.IndexOf("explosion", StringComparison.OrdinalIgnoreCase) >= 0 ||
+            reason.IndexOf("spark", StringComparison.OrdinalIgnoreCase) >= 0)
+        {
+            AudioManager.PlayExplosion();
+        }
+        else if (reason.IndexOf("fire", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                 reason.IndexOf("candle", StringComparison.OrdinalIgnoreCase) >= 0)
+        {
+            AudioManager.PlayExplosion();
+        }
+        else if (reason.IndexOf("painting", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                 reason.IndexOf("glass", StringComparison.OrdinalIgnoreCase) >= 0)
+        {
+            AudioManager.PlayPaintingFall();
+        }
+        else if (reason.IndexOf("wardrobe", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                 reason.IndexOf("dolap", StringComparison.OrdinalIgnoreCase) >= 0)
+        {
+            AudioManager.PlayWardrobeCrash();
+        }
+        else if (reason.IndexOf("cabinet", StringComparison.OrdinalIgnoreCase) >= 0)
+        {
+            AudioManager.PlayCabinetCrash();
+        }
+        else if (reason.IndexOf("door", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                 reason.IndexOf("stair", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                 reason.IndexOf("lateral", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                 reason.IndexOf("fall", StringComparison.OrdinalIgnoreCase) >= 0)
+        {
+            AudioManager.PlayDoorRushFall();
+        }
+        else if (reason.IndexOf("gas", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                 reason.IndexOf("suffocation", StringComparison.OrdinalIgnoreCase) >= 0)
+        {
+            AudioManager.PlayGasSuffocation();
+        }
+        else
+        {
+            AudioManager.PlayExplosion();
+        }
+    }
+
+    private IEnumerator SwitchDeathSequence(string reason, float rewindSeconds, float holdDuration, Action onFinishedDisplay = null)
     {
         triggered = true;
         IsAnyHazardActive = true;
-        AudioManager.PlayExplosion();
+        PlayHazardSound(reason);
 
         // 1. FREEZE / STOP TIME
         Time.timeScale = 0f;
@@ -703,6 +833,15 @@ public class SwitchInteraction : MonoBehaviour
 
         // 3. Center on camera & display on Layer 20
         EnsureSwitchImageReference();
+        if (HazardVisualManager.Instance != null)
+        {
+            var hazardComp = HazardVisualManager.Instance.GetHazard(reason);
+            if (hazardComp != null && hazardComp.switchImage != null)
+            {
+                switchImage = hazardComp.switchImage;
+            }
+        }
+
         if (switchImage != null)
         {
             CenterOnCamera(switchImage);
@@ -710,8 +849,26 @@ public class SwitchInteraction : MonoBehaviour
             switchImage.SetActive(true);
         }
 
-        // 4. Hold visual for holdDuration seconds while time is frozen
-        yield return new WaitForSecondsRealtime(holdDuration);
+        // 4. Hold visual for holdDuration seconds while time is frozen, allowing skip on Space/Enter/Click after 0.4s
+        float elapsed = 0f;
+        while (elapsed < holdDuration)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            if (elapsed > 0.4f)
+            {
+                if (Keyboard.current != null && (Keyboard.current.spaceKey.wasPressedThisFrame || Keyboard.current.enterKey.wasPressedThisFrame || Keyboard.current.eKey.wasPressedThisFrame))
+                {
+                    break;
+                }
+                if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame)
+                {
+                    break;
+                }
+            }
+            yield return null;
+        }
+
+        onFinishedDisplay?.Invoke();
 
         // 5. Initiate rewind with visual open until eyelids close
         if (GameTimelineManager.Instance != null)
@@ -750,7 +907,6 @@ public class SwitchInteraction : MonoBehaviour
             TimeRewindController.Instance.PlayTimeRewind(
                 reason,
                 rewindSeconds,
-
                 onRewindStateRestore: () =>
                 {
                     if (switchImage != null)
@@ -763,7 +919,6 @@ public class SwitchInteraction : MonoBehaviour
                     triggered = false;
                     IsAnyHazardActive = false;
                 },
-
                 onComplete: () =>
                 {
                     Time.timeScale = 1f;

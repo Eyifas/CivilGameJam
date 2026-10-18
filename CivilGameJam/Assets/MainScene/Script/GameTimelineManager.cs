@@ -888,15 +888,13 @@ public class GameTimelineManager : MonoBehaviour
     {
         if (currentStage == GameStage.Rewinding) return;
 
-        // If not already triggered from a hazard visual, display the comic failure visual first!
-        if (!isFromVisual)
+        // If not already triggered from a hazard visual, trigger its visual sequence first
+        if (!isFromVisual && HazardVisualManager.Instance != null)
         {
-            if (HazardVisualManager.Instance != null)
+            var hazard = HazardVisualManager.Instance.GetHazard(educationalReason);
+            if (hazard != null && !hazard.IsTriggered)
             {
-                HazardVisualManager.Instance.ShowHazardVisual(educationalReason, () =>
-                {
-                    TriggerRewind(educationalReason, isFromVisual: true, onStateRestore, onComplete);
-                });
+                hazard.TriggerSequence();
                 return;
             }
         }

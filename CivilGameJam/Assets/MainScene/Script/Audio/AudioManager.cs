@@ -425,6 +425,22 @@ public class AudioManager : MonoBehaviour
         PlaySFX(SFXType.CabinetCrash, 0.95f);
     }
 
+    public static void PlayPaintingFall()
+    {
+        PlaySFX(SFXType.PaintingRattle, 1.0f);
+        PlaySFX(SFXType.CabinetCrash, 0.7f, 1.4f);
+    }
+
+    public static void PlayDoorRushFall()
+    {
+        PlaySFX(SFXType.WardrobeCrash, 0.85f, 1.2f);
+    }
+
+    public static void PlayGasSuffocation()
+    {
+        PlaySFX(SFXType.QTEMiss, 1.0f, 0.7f);
+    }
+
     public static void PlayValveTurn()
     {
         PlaySFX(SFXType.ValveTurn, 0.85f, UnityEngine.Random.Range(0.94f, 1.06f));

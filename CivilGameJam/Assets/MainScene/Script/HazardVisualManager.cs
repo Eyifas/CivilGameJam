@@ -1,18 +1,19 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
-using UnityEngine.UI;
 using TMPro;
-using UnityEngine.InputSystem;
 
 /// <summary>
-/// Controls high-impact, fullscreen educational death/hazard visuals for all failure reasons in the game.
-/// Rendered on a persistent ScreenSpaceOverlay Canvas (sortingOrder = 9500), guaranteeing 100% visibility
-/// regardless of camera coordinates, zoom level, room boundaries, or 2D lighting.
-/// Plays dramatic hazard-specific audio, letterboxes the scene, animates the comic artwork card with a punchy bounce,
-/// and presents clear educational cause & survival rules before seamlessly transitioning to TimeRewind.
+/// Manages high-impact, fullscreen educational death/hazard visuals for all failure reasons in the game.
+/// Restores the authentic world/camera visual architecture from commit 2faca7d0ae0a7d89dfc0937f7a71e06ca1f900f1:
+/// - Real, high-resolution comic artwork loaded from project assets (Color.white, unlit, no color tints)
+/// - Centered directly in front of the active camera on Sorting Order 20
+/// - Backed with a solid black letterbox underlay on Sorting Order 19 that completely fills the entire screen
+/// - If an image has not been added yet, displays a clean placeholder: "Hazard: {type} to be added"
+/// - Freeze time (Time.timeScale = 0f, timers paused, player frozen, lights disabled)
+/// - Plays hazard-specific sound effects and holds for dramatic recognition
+/// - Seamless transition into TimeRewindController loop
 /// </summary>
 public class HazardVisualManager : MonoBehaviour
 {
@@ -47,46 +48,25 @@ public class HazardVisualManager : MonoBehaviour
         }
     }
 
-    public enum HazardSFXType
-    {
-        Explosion,
-        CabinetCrash,
-        WardrobeCrash,
-        PaintingFall,
-        DoorRushFall,
-        GasSuffocation,
-        TremorRumble
-    }
-
     [System.Serializable]
     public class HazardConfig
     {
         public string id;
         public string title;
         public string[] matchKeywords;
+        [TextArea(2, 4)]
+        public string educationalReason;
+        public float rewindDuration;
         public string resourcePath;
-        public string[] filePaths;
-        public HazardSFXType sfxType;
-        public Color accentColor = new Color(1f, 0.28f, 0.25f, 1f);
     }
 
-    private List<HazardConfig> hazardConfigs;
+    [Header("Registered Hazards Configuration")]
+    [SerializeField] private List<HazardConfig> hazardConfigs = new List<HazardConfig>();
 
-    // Overlay Canvas & UI Components
-    private Canvas hazardCanvas;
-    private CanvasGroup canvasGroup;
-    private Image backdropImage;
-    private Image redVignetteImage;
-    private RectTransform cardTransform;
-    private Image comicImage;
-    private Image cardBorderImage;
-    private TMP_Text badgeText;
-    private TMP_Text titleText;
-    private TMP_Text reasonText;
-    private TMP_Text promptText;
+    private readonly Dictionary<string, SwitchInteraction> activeHazardInteractions = new Dictionary<string, SwitchInteraction>(StringComparer.OrdinalIgnoreCase);
+    private Transform hazardRoot;
 
-    private bool isShowing = false;
-    public bool IsShowing => isShowing;
+    public bool IsShowing => SwitchInteraction.IsAnyHazardActive;
 
     private void Awake()
     {
@@ -99,830 +79,588 @@ public class HazardVisualManager : MonoBehaviour
         s_instance = this;
         DontDestroyOnLoad(gameObject);
 
-        InitializeDefaultConfigs();
-        BuildCanvasUI();
+        InitializeDefaultConfigs(forceRefresh: true);
+        BuildHazardGameObjects();
     }
 
-    private void InitializeDefaultConfigs()
+    [ContextMenu("Build / Refresh Hazard GameObjects in Scene")]
+    public void ManualBuildInEditor()
     {
+        InitializeDefaultConfigs(forceRefresh: true);
+        BuildHazardGameObjects();
+    }
+
+    private void InitializeDefaultConfigs(bool forceRefresh = false)
+    {
+        if (!forceRefresh && hazardConfigs != null && hazardConfigs.Count > 0)
+        {
+            return;
+        }
+
         hazardConfigs = new List<HazardConfig>
         {
-            // 1. Stage 2 - Candle fire (Comic Panel 2)
+            // 1. Stage 2 - Candle fire (comic 2)
             new HazardConfig
             {
                 id = "Hazard_CandleFire",
-                title = "APARTMENT FIRE HAZARD",
-                matchKeywords = new[] { "candle", "APARTMENT FIRE", "flames", "igniting the room" },
-                resourcePath = "Hazards/comic_panel_2_earthquake_fire",
-                filePaths = new[]
-                {
-                    "Resources/Hazards/comic_panel_2_earthquake_fire.png",
-                    "MainScene/Sprite/Hazards/comic_panel_2_earthquake_fire.png"
-                },
-                sfxType = HazardSFXType.Explosion,
-                accentColor = new Color(1f, 0.45f, 0.15f, 1f)
+                title = "APARTMENT FIRE",
+                matchKeywords = new[] { "candle", "APARTMENT FIRE", "flames" },
+                educationalReason = "APARTMENT FIRE: The lit candle on the desk toppled over during the tremor, igniting the room! Always extinguish open flames and candles before an earthquake strikes!",
+                rewindDuration = 15f,
+                resourcePath = "Hazards/comic_panel_2_earthquake_fire"
             },
 
-            // 2. Stage 2 - Heavy wall painting falls (Comic Panel 1)
+            // 2. Stage 2 - Heavy wall painting falls (comic 1)
             new HazardConfig
             {
                 id = "Hazard_PaintingFall",
-                title = "FALLING WALL DECORATION",
-                matchKeywords = new[] { "painting", "wall hangings", "shattered glass", "heavy wall painting" },
-                resourcePath = "Hazards/comic_panel_1_picture_frame",
-                filePaths = new[]
-                {
-                    "Resources/Hazards/comic_panel_1_picture_frame.png",
-                    "MainScene/Sprite/Hazards/comic_panel_1_picture_frame.png"
-                },
-                sfxType = HazardSFXType.PaintingFall,
-                accentColor = new Color(1f, 0.35f, 0.25f, 1f)
+                title = "FALLING WALL PAINTING",
+                matchKeywords = new[] { "painting", "wall hangings", "shattered glass" },
+                educationalReason = "FATAL INJURY: The heavy wall painting above the desk fell and shattered glass! Always remove or securely anchor heavy wall hangings over desks/beds!",
+                rewindDuration = 15f,
+                resourcePath = "Hazards/comic_panel_1_picture_frame"
             },
 
-            // 3. Stage 3 - Light switch spark explosion (Explosion Art)
+            // 3. Stage 2 - Ran to the door during tremor (1000000107)
             new HazardConfig
             {
-                id = "Hazard_ElectricSwitch",
-                title = "ELECTRICAL SPARK GAS EXPLOSION",
-                matchKeywords = new[] { "electrical light switch", "switch sparked", "FATAL EXPLOSION", "leaking gas", "spark caused gas explosion", "TEST REWIND" },
-                resourcePath = "Hazards/explosion",
-                filePaths = new[]
-                {
-                    "Resources/Hazards/explosion.png",
-                    "MainScene/Sprite/Hazards/explosion.png",
-                    "Scenes/1000000106.png"
-                },
-                sfxType = HazardSFXType.Explosion,
-                accentColor = new Color(1f, 0.85f, 0.2f, 1f)
+                id = "Hazard_DoorRush",
+                title = "DOOR RUSH FALL",
+                matchKeywords = new[] { "lateral forces", "RunDoor", "FATAL FALL", "violent lateral" },
+                educationalReason = "FATAL FALL: Violent lateral forces threw you into walls and falling debris! Never run while the building is shaking—Drop, Cover, and Hold On!",
+                rewindDuration = 5f,
+                resourcePath = "Hazards/1000000107"
             },
 
-            // 4. Stage 3 - Overhead Kitchen Cabinet Fall (Cupboard QTE Fail)
+            // 4. Stage 2 - Tremor timeout / panic freeze (1000000107)
+            new HazardConfig
+            {
+                id = "Hazard_TremorPanicTimeout",
+                title = "PANIC FREEZE / DEBRIS",
+                matchKeywords = new[] { "Frozen in panic", "drop under sturdy", "knocks you down" },
+                educationalReason = "TIME RAN OUT: Frozen in panic! In an earthquake, drop under sturdy furniture within seconds before violent shaking knocks you down!",
+                rewindDuration = 5f,
+                resourcePath = "Hazards/1000000107"
+            },
+
+            // 5. Stage 3 - Cabinet fall during aftershock (To be added)
             new HazardConfig
             {
                 id = "Hazard_CabinetFall",
                 title = "OVERHEAD CABINET FALL",
-                matchKeywords = new[] { "cabinet fell", "shifting cabinet", "overhead obstacles", "STRUCK BY CABINET DOOR" },
-                resourcePath = "dolap mutfak1",
-                filePaths = new[]
-                {
-                    "MainScene/Sprite/dolap mutfak1.png",
-                    "MainScene/Sprite/dolap mutfak.png",
-                    "Resources/Hazards/comic_panel_1_picture_frame.png"
-                },
-                sfxType = HazardSFXType.CabinetCrash,
-                accentColor = new Color(0.95f, 0.55f, 0.2f, 1f)
+                matchKeywords = new[] { "cabinet fell", "shifting cabinet", "overhead obstacles" },
+                educationalReason = "FATAL INJURY: The shifting cabinet fell on you during the aftershock! React quickly to secure loose overhead obstacles!",
+                rewindDuration = 5f,
+                resourcePath = "Hazards/hazard_cabinet_fall"
             },
 
-            // 5. Stage 3 - Heavy Hallway Wardrobe Fall (Dolap QTE Fail)
+            // 6. Stage 3 - Heavy wardrobe / dolap collapse (To be added)
             new HazardConfig
             {
                 id = "Hazard_WardrobeFall",
-                title = "FALLEN WARDROBE CRUSH",
-                matchKeywords = new[] { "wardrobe fell", "heavy wardrobe", "düşme dolap", "brace and hold your footing" },
-                resourcePath = "düşme dolap4",
-                filePaths = new[]
-                {
-                    "MainScene/Sprite/düşme dolap4.png",
-                    "MainScene/Sprite/düşme dolap3.png",
-                    "MainScene/Sprite/düşme dolap1.png"
-                },
-                sfxType = HazardSFXType.WardrobeCrash,
-                accentColor = new Color(0.9f, 0.4f, 0.2f, 1f)
+                title = "WARDROBE COLLAPSE",
+                matchKeywords = new[] { "wardrobe", "dolap", "crushed", "fell on you" },
+                educationalReason = "WARDROBE COLLAPSE: The heavy unanchored wardrobe toppled over and crushed you! Always lift or secure fallen obstacles before moving forward!",
+                rewindDuration = 5f,
+                resourcePath = "Hazards/hazard_wardrobe_fall"
             },
 
-            // 6. Stage 3 - Toxic gas suffocation / gas in dark / gas leak timeout (Comic Panel 3)
+            // 7. Stage 3 - Light switch spark explosion (explosion)
             new HazardConfig
             {
-                id = "Hazard_GasSuffocation",
+                id = "Hazard_ElectricSwitch",
+                title = "GAS EXPLOSION (ELECTRIC SPARK)",
+                matchKeywords = new[] { "electrical light switch", "switch sparked", "FATAL EXPLOSION", "leaking gas" },
+                educationalReason = "FATAL EXPLOSION: The electrical light switch sparked and ignited the leaking gas! NEVER flip light switches or create electrical sparks when you smell gas!",
+                rewindDuration = 5f,
+                resourcePath = "Hazards/explosion"
+            },
+
+            // 8. Stage 3 - Gas valve in total darkness (comic 3)
+            new HazardConfig
+            {
+                id = "Hazard_GasInDark",
+                title = "VALVE IN TOTAL DARKNESS",
+                matchKeywords = new[] { "gas valve in total darkness", "packed flashlight is essential", "broken fixtures" },
+                educationalReason = "IN THE DARK: You couldn't locate the gas valve in total darkness and tripped over broken fixtures! A packed flashlight is essential for utility shut-off!",
+                rewindDuration = 15f,
+                resourcePath = "Hazards/comic_panel_3_gas_leak"
+            },
+
+            // 9. Stage 3 - Gas leak timeout (comic 3)
+            new HazardConfig
+            {
+                id = "Hazard_GasTimeout",
                 title = "TOXIC GAS SUFFOCATION",
-                matchKeywords = new[] { "Lingered too long", "leaking natural gas", "TOXIC GAS", "gas valve in total darkness", "packed flashlight is essential", "broken fixtures", "IN THE DARK", "gas leak" },
-                resourcePath = "Hazards/comic_panel_3_gas_leak",
-                filePaths = new[]
-                {
-                    "Resources/Hazards/comic_panel_3_gas_leak.jpg",
-                    "MainScene/Sprite/Hazards/comic_panel_3_gas_leak.jpg"
-                },
-                sfxType = HazardSFXType.GasSuffocation,
-                accentColor = new Color(0.4f, 0.9f, 0.4f, 1f)
+                matchKeywords = new[] { "Lingered too long", "leaking natural gas" },
+                educationalReason = "TIME RAN OUT: Lingered too long in an apartment with leaking natural gas!",
+                rewindDuration = 15f,
+                resourcePath = "Hazards/comic_panel_3_gas_leak"
             },
 
-            // 7. Stage 2 - Ran to the door during tremor (Violent Fall)
-            new HazardConfig
-            {
-                id = "Hazard_DoorRush",
-                title = "VIOLENT LATERAL FORCES FALL",
-                matchKeywords = new[] { "lateral forces", "RunDoor", "FATAL FALL", "violent lateral", "Never run while the building is shaking" },
-                resourcePath = "Story/1000000104",
-                filePaths = new[]
-                {
-                    "MainScene/Sprite/Story/1000000104.png",
-                    "Scenes/1000000106.png"
-                },
-                sfxType = HazardSFXType.DoorRushFall,
-                accentColor = new Color(1f, 0.3f, 0.35f, 1f)
-            },
-
-            // 8. Stage 2 - Tremor timeout (panic / freeze)
-            new HazardConfig
-            {
-                id = "Hazard_TremorPanicTimeout",
-                title = "PANIC FREEZE / UNPROTECTED",
-                matchKeywords = new[] { "Frozen in panic", "drop under sturdy", "knocks you down", "TIME RAN OUT: Frozen" },
-                resourcePath = "Story/1000000104",
-                filePaths = new[]
-                {
-                    "MainScene/Sprite/Story/1000000104.png",
-                    "MainScene/Sprite/Story/1000000110.png"
-                },
-                sfxType = HazardSFXType.TremorRumble,
-                accentColor = new Color(1f, 0.65f, 0.2f, 1f)
-            },
-
-            // 9. Stage 3 Building Collapse (lingered in damaged apartment)
-            new HazardConfig
-            {
-                id = "Hazard_BuildingCollapse",
-                title = "STRUCTURAL BUILDING COLLAPSE",
-                matchKeywords = new[] { "building can collapse", "BUILDING COLLAPSE", "damaged apartment", "structural weakening", "lingered inside" },
-                resourcePath = "Story/1000000119",
-                filePaths = new[]
-                {
-                    "MainScene/Sprite/Story/1000000119.png",
-                    "Resources/Hazards/comic_panel_2_earthquake_fire.png"
-                },
-                sfxType = HazardSFXType.Explosion,
-                accentColor = new Color(1f, 0.45f, 0.2f, 1f)
-            },
-
-            // 10. Stage 4 - Tripped over stairs planter
+            // 10. Stage 4 - Tripped over stairs planter (To be added)
             new HazardConfig
             {
                 id = "Hazard_StairsPlanter",
-                title = "STAIRWELL FALL IN DARKNESS",
+                title = "STAIRS PLANTER FALL",
                 matchKeywords = new[] { "heavy planter", "fell down the stairs" },
-                resourcePath = "Story/1000000104",
-                filePaths = new[]
-                {
-                    "MainScene/Sprite/Story/1000000104.png"
-                },
-                sfxType = HazardSFXType.DoorRushFall,
-                accentColor = new Color(0.9f, 0.35f, 0.35f, 1f)
+                educationalReason = "INJURY: In total darkness without a flashlight, you tripped over the heavy planter and fell down the stairs!",
+                rewindDuration = 15f,
+                resourcePath = "Hazards/hazard_stairs_fall"
             },
 
-            // 11. Stage 4 - Blind search for neighbor
+            // 11. Stage 4 - Blind search for neighbor in dark corridor (comic 3)
             new HazardConfig
             {
                 id = "Hazard_CorridorSearch",
                 title = "BLIND CORRIDOR SEARCH",
                 matchKeywords = new[] { "Mr. Ahmet", "BLIND SEARCH", "dark corridor" },
-                resourcePath = "Hazards/comic_panel_3_gas_leak",
-                filePaths = new[]
-                {
-                    "Resources/Hazards/comic_panel_3_gas_leak.jpg"
-                },
-                sfxType = HazardSFXType.GasSuffocation,
-                accentColor = new Color(0.4f, 0.5f, 0.9f, 1f)
+                educationalReason = "BLIND SEARCH: Without a flashlight, you couldn't locate or treat Mr. Ahmet in the dark corridor.",
+                rewindDuration = 15f,
+                resourcePath = "Hazards/comic_panel_3_gas_leak"
             },
 
-            // 12. Stage 5 - Falling storefront facade
+            // 12. Stage 5 - Falling storefront facade (To be added)
             new HazardConfig
             {
                 id = "Hazard_StreetFacade",
                 title = "FALLING STOREFRONT FACADE",
-                matchKeywords = new[] { "storefront facade", "falling facade", "overhead hazards", "FATAL TRAUMA" },
-                resourcePath = "Hazards/comic_panel_1_picture_frame",
-                filePaths = new[]
-                {
-                    "Resources/Hazards/comic_panel_1_picture_frame.png",
-                    "MainScene/Sprite/Story/1000000112.png"
-                },
-                sfxType = HazardSFXType.PaintingFall,
-                accentColor = new Color(0.95f, 0.35f, 0.25f, 1f)
+                matchKeywords = new[] { "storefront facade", "falling facade", "overhead hazards" },
+                educationalReason = "FATAL TRAUMA: Struck by falling storefront facade! Watch overhead hazards when stepping into the street!",
+                rewindDuration = 5f,
+                resourcePath = "Hazards/hazard_street_facade"
             },
 
-            // 13. Stage 5 - Mountain road gridlock in car
+            // 13. Stage 5 - Mountain road gridlock in car (To be added)
             new HazardConfig
             {
                 id = "Hazard_CarGridlock",
                 title = "MOUNTAIN ROAD GRIDLOCK",
                 matchKeywords = new[] { "gridlocked", "GRIDLOCK TRAP", "Stay out of cars", "mountain road" },
-                resourcePath = "Story/1000000113",
-                filePaths = new[]
-                {
-                    "MainScene/Sprite/Story/1000000113.png"
-                },
-                sfxType = HazardSFXType.TremorRumble,
-                accentColor = new Color(0.7f, 0.6f, 0.55f, 1f)
+                educationalReason = "GRIDLOCK TRAP: You and hundreds of panicked drivers gridlocked the mountain road, blocking emergency rescue vehicles! Stay out of cars!",
+                rewindDuration = 5f,
+                resourcePath = "Hazards/hazard_car_gridlock"
             },
 
-            // 14. Stage 5 Finale / Tsunami (Comic Panel 4)
+            // 14. Stage 5 - Tsunami hazard (comic 4)
             new HazardConfig
             {
                 id = "Hazard_TsunamiEnding",
-                title = "TSUNAMI SECONDARY DISASTER",
-                matchKeywords = new[] { "tsunami", "DISASTER ESCALATION", "coastal areas" },
-                resourcePath = "Hazards/comic_panel_4_tsunami_ending",
-                filePaths = new[]
-                {
-                    "Resources/Hazards/comic_panel_4_tsunami_ending.jpg",
-                    "MainScene/Sprite/Hazards/comic_panel_4_tsunami_ending.jpg"
-                },
-                sfxType = HazardSFXType.Explosion,
-                accentColor = new Color(0.2f, 0.65f, 1f, 1f)
+                title = "TSUNAMI ZONE",
+                matchKeywords = new[] { "tsunami", "coast", "wave" },
+                educationalReason = "TSUNAMI HAZARD: Moving towards the sea or coastline after a major undersea earthquake is lethal! Move immediately to high ground!",
+                rewindDuration = 5f,
+                resourcePath = "Hazards/comic_panel_4_tsunami_ending"
             }
         };
     }
 
-    private void BuildCanvasUI()
+    public void BuildHazardGameObjects()
     {
-        var existingCanvas = transform.Find("HazardVisualOverlayCanvas");
-        if (existingCanvas != null)
+        if (hazardRoot == null)
         {
-            Destroy(existingCanvas.gameObject);
+            var existingRoot = GameObject.Find("HazardVisuals");
+            if (existingRoot != null)
+            {
+                hazardRoot = existingRoot.transform;
+            }
+            else
+            {
+                var rootObj = new GameObject("HazardVisuals");
+                hazardRoot = rootObj.transform;
+            }
         }
 
-        GameObject canvasObj = new GameObject("HazardVisualOverlayCanvas");
-        canvasObj.transform.SetParent(transform, false);
+        hazardRoot.SetParent(transform, true);
 
-        hazardCanvas = canvasObj.AddComponent<Canvas>();
-        hazardCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        hazardCanvas.sortingOrder = 9500; // Directly beneath eyelids at 9999
+        Sprite backdropSprite = GetSolidBlackSprite();
+        var artworkMat = SwitchInteraction.GetUnlitArtworkMaterial();
+        var backdropMat = SwitchInteraction.GetUnlitBackdropMaterial();
 
-        var scaler = canvasObj.AddComponent<CanvasScaler>();
-        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-        scaler.referenceResolution = new Vector2(1920, 1080);
-        scaler.matchWidthOrHeight = 0.5f;
+        foreach (var config in hazardConfigs)
+        {
+            Transform existingChild = hazardRoot.Find(config.id);
+            GameObject hazardObj;
+            SwitchInteraction switchComp;
 
-        canvasGroup = canvasObj.AddComponent<CanvasGroup>();
-        canvasObj.AddComponent<GraphicRaycaster>();
+            if (existingChild != null)
+            {
+                hazardObj = existingChild.gameObject;
+                switchComp = hazardObj.GetComponent<SwitchInteraction>();
+                if (switchComp == null) switchComp = hazardObj.AddComponent<SwitchInteraction>();
+            }
+            else
+            {
+                hazardObj = new GameObject(config.id);
+                hazardObj.transform.SetParent(hazardRoot, false);
+                switchComp = hazardObj.AddComponent<SwitchInteraction>();
+            }
 
-        // 1. Dark Fullscreen Backdrop
-        GameObject backdropObj = new GameObject("Backdrop");
-        backdropObj.transform.SetParent(canvasObj.transform, false);
-        var bdRect = backdropObj.AddComponent<RectTransform>();
-        bdRect.anchorMin = Vector2.zero;
-        bdRect.anchorMax = Vector2.one;
-        bdRect.sizeDelta = Vector2.zero;
+            // Configure SwitchInteraction
+            switchComp.SetTriggerOnInteract(false);
+            switchComp.SetEducationalReason(config.educationalReason);
+            switchComp.SetRewindDuration(config.rewindDuration);
+            switchComp.SetSortingOrder(20);
+            switchComp.SetImageDuration(2.2f);
 
-        backdropImage = backdropObj.AddComponent<Image>();
-        backdropImage.sprite = GetSolidSprite();
-        backdropImage.color = new Color(0.04f, 0.05f, 0.08f, 0.96f);
-        backdropImage.raycastTarget = true;
+            // Attempt loading real artwork sprite
+            Sprite realSprite = LoadHazardSprite(config.resourcePath);
 
-        // 2. Red Disaster Vignette Glow
-        GameObject vigObj = new GameObject("RedVignette");
-        vigObj.transform.SetParent(canvasObj.transform, false);
-        var vigRect = vigObj.AddComponent<RectTransform>();
-        vigRect.anchorMin = Vector2.zero;
-        vigRect.anchorMax = Vector2.one;
-        vigRect.sizeDelta = Vector2.zero;
+            // Ensure visual child exists (Visual / TempVisual)
+            Transform visualTransform = hazardObj.transform.Find("Visual") ?? hazardObj.transform.Find("TempVisual");
+            GameObject visualObj;
+            SpriteRenderer sr;
 
-        redVignetteImage = vigObj.AddComponent<Image>();
-        redVignetteImage.sprite = GetVignetteSprite();
-        redVignetteImage.color = new Color(0.85f, 0.12f, 0.12f, 0.40f);
-        redVignetteImage.raycastTarget = false;
+            if (visualTransform != null)
+            {
+                visualObj = visualTransform.gameObject;
+                visualObj.name = "Visual";
+                sr = visualObj.GetComponent<SpriteRenderer>();
+                if (sr == null) sr = visualObj.AddComponent<SpriteRenderer>();
+            }
+            else
+            {
+                visualObj = new GameObject("Visual");
+                visualObj.transform.SetParent(hazardObj.transform, false);
+                sr = visualObj.AddComponent<SpriteRenderer>();
+            }
 
-        // 3. Top Banner (Warning Badge + Hazard Title)
-        GameObject topBannerObj = new GameObject("TopBanner");
-        topBannerObj.transform.SetParent(canvasObj.transform, false);
-        var tbRect = topBannerObj.AddComponent<RectTransform>();
-        tbRect.anchorMin = new Vector2(0.5f, 1f);
-        tbRect.anchorMax = new Vector2(0.5f, 1f);
-        tbRect.pivot = new Vector2(0.5f, 1f);
-        tbRect.anchoredPosition = new Vector2(0f, -28f);
-        tbRect.sizeDelta = new Vector2(1200f, 110f);
+            // 1. Ensure solid black letterbox backdrop on Layer 18 (ALWAYS active)
+            Transform bdTransform = visualObj.transform.Find("Backdrop");
+            GameObject bdObj;
+            SpriteRenderer bdSr;
 
-        var tbBg = topBannerObj.AddComponent<Image>();
-        tbBg.sprite = GetSolidSprite();
-        tbBg.color = new Color(0.08f, 0.10f, 0.14f, 0.90f);
+            if (bdTransform != null)
+            {
+                bdObj = bdTransform.gameObject;
+                bdSr = bdObj.GetComponent<SpriteRenderer>();
+                if (bdSr == null) bdSr = bdObj.AddComponent<SpriteRenderer>();
+            }
+            else
+            {
+                bdObj = new GameObject("Backdrop");
+                bdObj.transform.SetParent(visualObj.transform, false);
+                bdSr = bdObj.AddComponent<SpriteRenderer>();
+            }
 
-        GameObject badgeObj = new GameObject("BadgeText");
-        badgeObj.transform.SetParent(topBannerObj.transform, false);
-        var bRect = badgeObj.AddComponent<RectTransform>();
-        bRect.anchorMin = new Vector2(0f, 0.55f);
-        bRect.anchorMax = new Vector2(1f, 1f);
-        bRect.sizeDelta = Vector2.zero;
+            bdSr.sprite = backdropSprite;
+            bdSr.color = Color.black;
+            bdSr.sortingLayerName = "Default";
+            bdSr.sortingOrder = 18; // Strictly behind artwork and placeholder
+            if (backdropMat != null) bdSr.sharedMaterial = backdropMat;
+            bdObj.transform.localPosition = new Vector3(0f, 0f, 0.5f);
 
-        badgeText = badgeObj.AddComponent<TextMeshProUGUI>();
-        badgeText.fontSize = 20f;
-        badgeText.fontStyle = FontStyles.Bold;
-        badgeText.alignment = TextAlignmentOptions.Center;
-        badgeText.text = "<color=#FF4444>[ CRITICAL DISASTER HAZARD ]</color>";
+            // 2. Artwork vs. Placeholder
+            if (realSprite != null)
+            {
+                // Artwork is added
+                sr.enabled = true;
+                sr.sprite = realSprite;
+                sr.sortingLayerName = "Default";
+                sr.sortingOrder = 20;
+                sr.color = Color.white;
+                if (artworkMat != null) sr.sharedMaterial = artworkMat;
 
-        GameObject titleObj = new GameObject("TitleText");
-        titleObj.transform.SetParent(topBannerObj.transform, false);
-        var tRect = titleObj.AddComponent<RectTransform>();
-        tRect.anchorMin = new Vector2(0f, 0f);
-        tRect.anchorMax = new Vector2(1f, 0.60f);
-        tRect.sizeDelta = Vector2.zero;
+                // Deactivate placeholder label
+                Transform oldLabel = visualObj.transform.Find("PlaceholderLabel") ?? visualObj.transform.Find("TempLabel");
+                if (oldLabel != null)
+                {
+                    oldLabel.gameObject.SetActive(false);
+                }
+            }
+            else
+            {
+                // Image is NOT added: write "Hazard: {type} to be added"
+                sr.enabled = false;
+                sr.sprite = null;
 
-        titleText = titleObj.AddComponent<TextMeshProUGUI>();
-        titleText.fontSize = 32f;
-        titleText.fontStyle = FontStyles.Bold;
-        titleText.alignment = TextAlignmentOptions.Center;
-        titleText.color = Color.white;
-        titleText.text = "HAZARD FAILURE";
+                BuildPlaceholderLabel(visualObj.transform, config.title, config.educationalReason);
+            }
 
-        // 4. Central Artwork Card
-        GameObject cardBorderObj = new GameObject("ArtworkCardBorder");
-        cardBorderObj.transform.SetParent(canvasObj.transform, false);
-        cardTransform = cardBorderObj.AddComponent<RectTransform>();
-        cardTransform.anchorMin = new Vector2(0.5f, 0.5f);
-        cardTransform.anchorMax = new Vector2(0.5f, 0.5f);
-        cardTransform.pivot = new Vector2(0.5f, 0.5f);
-        cardTransform.anchoredPosition = new Vector2(0f, 32f);
-        cardTransform.sizeDelta = new Vector2(1048f, 558f);
+            visualObj.SetActive(false);
+            switchComp.SetSwitchImage(visualObj);
 
-        cardBorderImage = cardBorderObj.AddComponent<Image>();
-        cardBorderImage.sprite = GetSolidSprite();
-        cardBorderImage.color = new Color(0.9f, 0.25f, 0.22f, 0.9f);
+            // Register in lookup
+            activeHazardInteractions[config.id] = switchComp;
+        }
 
-        GameObject comicObj = new GameObject("ComicImage");
-        comicObj.transform.SetParent(cardBorderObj.transform, false);
-        var cRect = comicObj.AddComponent<RectTransform>();
-        cRect.anchorMin = Vector2.zero;
-        cRect.anchorMax = Vector2.one;
-        cRect.sizeDelta = new Vector2(-8f, -8f); // 4px padding inside border
-        cRect.anchoredPosition = Vector2.zero;
-
-        comicImage = comicObj.AddComponent<Image>();
-        comicImage.preserveAspect = true;
-        comicImage.color = Color.white;
-
-        // 5. Bottom Educational Panel (Cause & Survival Rule)
-        GameObject botPanelObj = new GameObject("BottomEducationalPanel");
-        botPanelObj.transform.SetParent(canvasObj.transform, false);
-        var bpRect = botPanelObj.AddComponent<RectTransform>();
-        bpRect.anchorMin = new Vector2(0.5f, 0f);
-        bpRect.anchorMax = new Vector2(0.5f, 0f);
-        bpRect.pivot = new Vector2(0.5f, 0f);
-        bpRect.anchoredPosition = new Vector2(0f, 54f);
-        bpRect.sizeDelta = new Vector2(1380f, 130f);
-
-        var bpBg = botPanelObj.AddComponent<Image>();
-        bpBg.sprite = GetSolidSprite();
-        bpBg.color = new Color(0.07f, 0.09f, 0.13f, 0.94f);
-
-        GameObject reasonObj = new GameObject("ReasonText");
-        reasonObj.transform.SetParent(botPanelObj.transform, false);
-        var rRect = reasonObj.AddComponent<RectTransform>();
-        rRect.anchorMin = Vector2.zero;
-        rRect.anchorMax = Vector2.one;
-        rRect.sizeDelta = new Vector2(-40f, -16f);
-        rRect.anchoredPosition = Vector2.zero;
-
-        reasonText = reasonObj.AddComponent<TextMeshProUGUI>();
-        reasonText.fontSize = 21f;
-        reasonText.alignment = TextAlignmentOptions.Center;
-        reasonText.color = Color.white;
-        reasonText.richText = true;
-
-        // 6. Bottom Skip / Continue Prompt
-        GameObject promptObj = new GameObject("PromptText");
-        promptObj.transform.SetParent(canvasObj.transform, false);
-        var prRect = promptObj.AddComponent<RectTransform>();
-        prRect.anchorMin = new Vector2(0.5f, 0f);
-        prRect.anchorMax = new Vector2(0.5f, 0f);
-        prRect.pivot = new Vector2(0.5f, 0f);
-        prRect.anchoredPosition = new Vector2(0f, 16f);
-        prRect.sizeDelta = new Vector2(1000f, 30f);
-
-        promptText = promptObj.AddComponent<TextMeshProUGUI>();
-        promptText.fontSize = 17f;
-        promptText.fontStyle = FontStyles.Italic;
-        promptText.alignment = TextAlignmentOptions.Center;
-        promptText.color = new Color(0.8f, 0.86f, 0.92f, 0.85f);
-        promptText.text = "Press [SPACE] or [CLICK] to Rewind Time";
-
-        canvasObj.SetActive(false);
+        Debug.Log($"<color=cyan>[HazardVisualManager] Successfully configured {hazardConfigs.Count} hazard visuals.</color>");
     }
 
-    /// <summary>
-    /// Displays the high-impact hazard failure card, plays dramatic SFX, freezes gameplay,
-    /// and smoothly triggers onFinished (initiating TimeRewind) after display duration.
-    /// </summary>
-    public void ShowHazardVisual(string educationalReason, Action onVisualFinished)
+    private static TMP_FontAsset s_defaultFont;
+    public static TMP_FontAsset GetDefaultFont()
     {
-        if (hazardCanvas == null) BuildCanvasUI();
-
-        StopAllCoroutines();
-        StartCoroutine(ShowHazardVisualRoutine(educationalReason, onVisualFinished));
+        if (s_defaultFont != null) return s_defaultFont;
+        s_defaultFont = Resources.Load<TMP_FontAsset>("Fonts & Materials/LiberationSans SDF");
+        if (s_defaultFont == null) s_defaultFont = Resources.Load<TMP_FontAsset>("LiberationSans SDF");
+        if (s_defaultFont == null)
+        {
+            var all = Resources.FindObjectsOfTypeAll<TMP_FontAsset>();
+            if (all != null && all.Length > 0) s_defaultFont = all[0];
+        }
+#if UNITY_EDITOR
+        if (s_defaultFont == null)
+        {
+            var guids = UnityEditor.AssetDatabase.FindAssets("t:TMP_FontAsset");
+            if (guids != null && guids.Length > 0)
+            {
+                string p = UnityEditor.AssetDatabase.GUIDToAssetPath(guids[0]);
+                s_defaultFont = UnityEditor.AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(p);
+            }
+        }
+#endif
+        return s_defaultFont;
     }
 
-    private IEnumerator ShowHazardVisualRoutine(string educationalReason, Action onVisualFinished)
+    private void BuildPlaceholderLabel(Transform parent, string title, string reason)
     {
-        isShowing = true;
-        Time.timeScale = 0f;
+        Transform existing = parent.Find("PlaceholderLabel") ?? parent.Find("TempLabel");
+        GameObject labelObj;
+        TextMeshPro tmp;
 
-        // Stop earthquake shake and sound effects to allow clear visual presentation
-        var cam = FindFirstObjectByType<RoomCamera>();
-        if (cam != null) cam.StopEarthquake();
-        AudioManager.SetEarthquakeRumbleActive(false);
-        AudioManager.SetGasHissActive(false);
-
-        // Turn off player lights
-        var allPlayers = FindObjectsByType<PlayerMovement>(FindObjectsInactive.Include, FindObjectsSortMode.None);
-        foreach (var p in allPlayers)
+        if (existing != null)
         {
-            p.TurnOffAllLights();
-            p.enabled = false;
-        }
-
-        // Match Hazard Config
-        HazardConfig config = FindBestMatchingConfig(educationalReason);
-
-        // Play matching dramatic audio
-        PlayHazardSound(config.sfxType);
-
-        // Load and assign comic artwork sprite
-        Sprite artworkSprite = LoadProjectSprite(config.resourcePath, config.filePaths);
-        if (artworkSprite == null)
-        {
-            artworkSprite = LoadFallbackSprite(config.title);
-        }
-
-        comicImage.sprite = artworkSprite;
-        cardBorderImage.color = config.accentColor;
-        titleText.text = $"<b>{config.title}</b>";
-        titleText.color = config.accentColor;
-
-        // Format educational cause & safety rule nicely
-        FormatEducationalReason(educationalReason, out string formattedCause, out string formattedRule);
-        if (!string.IsNullOrEmpty(formattedRule))
-        {
-            reasonText.text = $"<color=#FFE082><b>CAUSE:</b> {formattedCause}</color>\n<color=#80D8FF><b>SAFETY RULE:</b> {formattedRule}</color>";
+            labelObj = existing.gameObject;
+            labelObj.name = "PlaceholderLabel";
+            labelObj.SetActive(true);
+            tmp = labelObj.GetComponent<TextMeshPro>();
+            if (tmp == null) tmp = labelObj.AddComponent<TextMeshPro>();
         }
         else
         {
-            reasonText.text = $"<color=#FFE082><b>INCIDENT:</b> {formattedCause}</color>";
+            labelObj = new GameObject("PlaceholderLabel");
+            labelObj.transform.SetParent(parent, false);
+            tmp = labelObj.AddComponent<TextMeshPro>();
         }
 
-        hazardCanvas.gameObject.SetActive(true);
-        canvasGroup.alpha = 0f;
-        cardTransform.localScale = Vector3.one * 0.90f;
+        labelObj.transform.localPosition = new Vector3(0f, 0f, -0.2f);
+        labelObj.transform.localScale = Vector3.one;
 
-        // Punchy scale-in bounce animation (unscaled time)
-        float animElapsed = 0f;
-        float animDuration = 0.22f;
-        while (animElapsed < animDuration)
+        // Clean, readable placeholder notice requested by user
+        var font = GetDefaultFont();
+        if (font != null)
         {
-            animElapsed += Time.unscaledDeltaTime;
-            float t = Mathf.Clamp01(animElapsed / animDuration);
-            // Ease-out overshoot
-            float scale = Mathf.Lerp(0.90f, 1.0f, Mathf.Sin(t * Mathf.PI * 0.5f));
-            cardTransform.localScale = new Vector3(scale, scale, 1f);
-            canvasGroup.alpha = t;
-            yield return null;
+            tmp.font = font;
         }
+        tmp.text = $"<size=130%><color=#FFD700><b>Hazard: {title} to be added</b></color></size>\n\n<size=65%><color=#D8D8D8>{reason}</color></size>";
+        tmp.alignment = TextAlignmentOptions.Center;
+        tmp.fontSize = 6.5f;
+        tmp.sortingLayerID = SortingLayer.NameToID("Default");
+        tmp.sortingOrder = 22; // In front of backdrop (18) and sprite (20)
+        tmp.rectTransform.sizeDelta = new Vector2(16f, 8f);
+    }
 
-        cardTransform.localScale = Vector3.one;
-        canvasGroup.alpha = 1f;
-
-        // Hold display for 2.4s (skippable after 0.45s)
-        float holdElapsed = 0f;
-        float holdDuration = 2.4f;
-        while (holdElapsed < holdDuration)
+    private static Sprite s_solidBlackSprite;
+    public static Sprite GetSolidBlackSprite()
+    {
+        if (s_solidBlackSprite != null) return s_solidBlackSprite;
+        int size = 2;
+        Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        for (int y = 0; y < size; y++)
         {
-            holdElapsed += Time.unscaledDeltaTime;
-
-            if (holdElapsed >= 0.45f)
+            for (int x = 0; x < size; x++)
             {
-                bool spacePressed = Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame;
-                bool enterPressed = Keyboard.current != null && Keyboard.current.enterKey.wasPressedThisFrame;
-                bool ePressed = Keyboard.current != null && Keyboard.current.eKey.wasPressedThisFrame;
-                bool clickPressed = Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame;
-
-                if (spacePressed || enterPressed || ePressed || clickPressed)
-                {
-                    break;
-                }
+                tex.SetPixel(x, y, Color.black);
             }
-
-            yield return null;
         }
-
-        // Note: Do NOT hide canvas immediately here; let the eyelids close OVER it smoothly,
-        // then Hide() will be called when eyelids are fully closed (onRewindStateRestore).
-        onVisualFinished?.Invoke();
+        tex.Apply();
+        // 2x2 sprite with 1 pixel per unit = exactly 2x2 world units
+        s_solidBlackSprite = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 1f);
+        return s_solidBlackSprite;
     }
 
     /// <summary>
-    /// Instantly hides the hazard overlay canvas (called when eyelids are fully shut or rewind finishes).
+    /// Finds a registered SwitchInteraction matching the given educational reason or keyword.
     /// </summary>
-    public void Hide()
+    public SwitchInteraction GetHazard(string educationalReason)
     {
-        if (hazardCanvas != null)
-        {
-            hazardCanvas.gameObject.SetActive(false);
-        }
-        isShowing = false;
-    }
+        if (string.IsNullOrEmpty(educationalReason)) return null;
 
-    private void PlayHazardSound(HazardSFXType sfxType)
-    {
-        switch (sfxType)
+        foreach (var config in hazardConfigs)
         {
-            case HazardSFXType.Explosion:
-                AudioManager.PlayExplosion();
-                break;
-            case HazardSFXType.CabinetCrash:
-                AudioManager.PlayCabinetCrash();
-                break;
-            case HazardSFXType.WardrobeCrash:
-                AudioManager.PlayWardrobeCrash();
-                break;
-            case HazardSFXType.PaintingFall:
-                AudioManager.PlayHammerHit();
-                break;
-            case HazardSFXType.DoorRushFall:
-                AudioManager.PlayHammerHit();
-                break;
-            case HazardSFXType.GasSuffocation:
-                AudioManager.SetGasHissActive(true, 0.75f);
-                break;
-            case HazardSFXType.TremorRumble:
-                AudioManager.SetEarthquakeRumbleActive(true, 0.85f);
-                break;
-        }
-    }
-
-    private HazardConfig FindBestMatchingConfig(string reason)
-    {
-        if (hazardConfigs == null || hazardConfigs.Count == 0)
-        {
-            InitializeDefaultConfigs();
-        }
-
-        if (string.IsNullOrEmpty(reason))
-        {
-            return hazardConfigs[0];
-        }
-
-        // 1. Keyword matching
-        foreach (var cfg in hazardConfigs)
-        {
-            if (reason.IndexOf(cfg.title, StringComparison.OrdinalIgnoreCase) >= 0)
+            if (educationalReason.IndexOf(config.title, StringComparison.OrdinalIgnoreCase) >= 0)
             {
-                return cfg;
+                if (activeHazardInteractions.TryGetValue(config.id, out var switchComp))
+                {
+                    return switchComp;
+                }
             }
 
-            if (cfg.matchKeywords != null)
+            foreach (var keyword in config.matchKeywords)
             {
-                foreach (var kw in cfg.matchKeywords)
+                if (educationalReason.IndexOf(keyword, StringComparison.OrdinalIgnoreCase) >= 0)
                 {
-                    if (reason.IndexOf(kw, StringComparison.OrdinalIgnoreCase) >= 0)
+                    if (activeHazardInteractions.TryGetValue(config.id, out var switchComp))
                     {
-                        return cfg;
+                        return switchComp;
                     }
                 }
             }
         }
 
-        // 2. Fallback default
-        return hazardConfigs[0];
-    }
-
-    private void FormatEducationalReason(string reason, out string cause, out string rule)
-    {
-        cause = reason ?? "An unexpected hazard occurred!";
-        rule = "";
-
-        if (string.IsNullOrEmpty(reason)) return;
-
-        // If in "[CATEGORY]: [Cause]! [Rule]" structure:
-        int colonIdx = reason.IndexOf(':');
-        string body = colonIdx >= 0 && colonIdx < reason.Length - 1 ? reason.Substring(colonIdx + 1).Trim() : reason.Trim();
-
-        int splitIdx = -1;
-        string[] ruleMarkers = new[] { " Always ", " Never ", " In an earthquake", " A packed flashlight", " Once ", " Watch ", " Stay out of", " Drop, Cover" };
-
-        foreach (var marker in ruleMarkers)
+        // Fallback: Check if any active hazard matches directly
+        foreach (var kvp in activeHazardInteractions)
         {
-            int idx = body.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
-            if (idx >= 0 && (splitIdx == -1 || idx < splitIdx))
+            if (kvp.Value != null && kvp.Value.EducationalReason.IndexOf(educationalReason, StringComparison.OrdinalIgnoreCase) >= 0)
             {
-                splitIdx = idx;
+                return kvp.Value;
             }
         }
 
-        if (splitIdx > 0)
+        return null;
+    }
+
+    /// <summary>
+    /// Triggers the death visual sequence for the matching educational reason.
+    /// Returns true if a visual was found and triggered.
+    /// </summary>
+    public bool TriggerHazard(string educationalReason)
+    {
+        var hazard = GetHazard(educationalReason);
+        if (hazard != null && !hazard.IsTriggered)
         {
-            cause = body.Substring(0, splitIdx).Trim();
-            rule = body.Substring(splitIdx).Trim();
+            hazard.TriggerSequence();
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Unified visual player with completion callback.
+    /// </summary>
+    public void ShowHazardVisual(string educationalReason, Action onDone = null)
+    {
+        var hazard = GetHazard(educationalReason);
+        if (hazard != null && !hazard.IsTriggered)
+        {
+            hazard.TriggerSequence(educationalReason, 5f, 2.2f, onDone);
         }
         else
         {
-            cause = body;
-            rule = "";
+            onDone?.Invoke();
+        }
+    }
+
+    /// <summary>
+    /// Hides all active hazard visuals immediately.
+    /// </summary>
+    public void Hide()
+    {
+        foreach (var kvp in activeHazardInteractions)
+        {
+            if (kvp.Value != null)
+            {
+                kvp.Value.HideVisual();
+            }
         }
     }
 
     /// <summary>
     /// Loads a sprite by resource path or relative asset path from disk/Resources/AssetDatabase.
-    /// Preserved for backwards compatibility with WorldChoicePrompt, ApartmentExitDoor, and DolapSceneController.
+    /// Supports single sprites, multi-sprite sprite sheets (e.g. 1000000107), Texture2Ds, and editor assets.
     /// </summary>
-    public static Sprite LoadHazardSprite(string resourcePath)
+    public static Sprite LoadHazardSprite(string path)
     {
-        if (string.IsNullOrEmpty(resourcePath)) return null;
+        if (string.IsNullOrEmpty(path)) return null;
 
-        // 1. Try Resources.Load<Sprite>
-        Sprite spr = Resources.Load<Sprite>(resourcePath);
+        // 1. Direct single sprite via Resources.Load
+        Sprite spr = Resources.Load<Sprite>(path);
         if (spr != null) return spr;
 
-        // 2. Try Resources.Load<Texture2D> and create Sprite
-        Texture2D tex = Resources.Load<Texture2D>(resourcePath);
+        // 2. Multi-sprite sheet via Resources.LoadAll (e.g. 1000000107_0)
+        Sprite[] allSpr = Resources.LoadAll<Sprite>(path);
+        if (allSpr != null && allSpr.Length > 0)
+        {
+            foreach (var s in allSpr)
+            {
+                if (s != null) return s;
+            }
+        }
+
+        // 3. Texture2D in Resources converted to Sprite
+        Texture2D tex = Resources.Load<Texture2D>(path);
         if (tex != null)
         {
             return Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f), 100f);
         }
 
+#if UNITY_EDITOR
+        // 4. In Unity Editor, try direct AssetDatabase loading
         string[] extensions = new[] { ".png", ".jpg", ".jpeg" };
-        List<string> candidatePaths = new List<string>();
-
         foreach (var ext in extensions)
         {
-            candidatePaths.Add("Resources/" + resourcePath + ext);
-            candidatePaths.Add("MainScene/Sprite/" + resourcePath + ext);
-            candidatePaths.Add(resourcePath + ext);
-        }
+            string p1 = "Assets/Resources/" + path + ext;
+            var s1 = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>(p1);
+            if (s1 != null) return s1;
 
-        return LoadProjectSprite(resourcePath, candidatePaths.ToArray());
-    }
-
-    /// <summary>
-    /// Highly robust multi-tier sprite loader:
-    /// 1. AssetDatabase in Unity Editor
-    /// 2. Resources.Load
-    /// 3. Direct byte loading from disk via File.ReadAllBytes & Texture2D.LoadImage
-    /// </summary>
-    public static Sprite LoadProjectSprite(string resourcePath, string[] relativeFilePaths)
-    {
-#if UNITY_EDITOR
-        if (relativeFilePaths != null)
-        {
-            foreach (var relPath in relativeFilePaths)
+            var all1 = UnityEditor.AssetDatabase.LoadAllAssetsAtPath(p1);
+            if (all1 != null)
             {
-                string assetPath = "Assets/" + relPath.Replace("\\", "/");
-                var adSprite = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>(assetPath);
-                if (adSprite != null) return adSprite;
-
-                var allAssets = UnityEditor.AssetDatabase.LoadAllAssetsAtPath(assetPath);
-                if (allAssets != null)
+                foreach (var a in all1)
                 {
-                    foreach (var a in allAssets)
-                    {
-                        if (a is Sprite s) return s;
-                    }
+                    if (a is Sprite s) return s;
+                }
+            }
+
+            string p2 = "Assets/" + path + ext;
+            var s2 = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>(p2);
+            if (s2 != null) return s2;
+
+            var all2 = UnityEditor.AssetDatabase.LoadAllAssetsAtPath(p2);
+            if (all2 != null)
+            {
+                foreach (var a in all2)
+                {
+                    if (a is Sprite s) return s;
                 }
             }
         }
 #endif
 
-        if (!string.IsNullOrEmpty(resourcePath))
+        // 5. File system raw bytes fallback (ensures guaranteed loading even outside Resources cache)
+        string[] exts = new[] { ".png", ".jpg", ".jpeg" };
+        foreach (var ext in exts)
         {
-            var res = Resources.Load<Sprite>(resourcePath);
-            if (res != null) return res;
-
-            var allRes = Resources.LoadAll<Sprite>(resourcePath);
-            if (allRes != null && allRes.Length > 0) return allRes[0];
+            string diskPath = System.IO.Path.Combine(Application.dataPath, "Resources", path + ext);
+            if (!System.IO.File.Exists(diskPath))
+            {
+                diskPath = System.IO.Path.Combine(Application.dataPath, path + ext);
+            }
+            if (System.IO.File.Exists(diskPath))
+            {
+                try
+                {
+                    byte[] fileData = System.IO.File.ReadAllBytes(diskPath);
+                    Texture2D diskTex = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+                    if (diskTex.LoadImage(fileData))
+                    {
+                        return Sprite.Create(diskTex, new Rect(0, 0, diskTex.width, diskTex.height), new Vector2(0.5f, 0.5f), 100f);
+                    }
+                }
+                catch { }
+            }
         }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Multi-tier sprite loader kept for backwards compatibility.
+    /// </summary>
+    public static Sprite LoadProjectSprite(string resourcePath, string[] relativeFilePaths)
+    {
+        Sprite s = LoadHazardSprite(resourcePath);
+        if (s != null) return s;
 
         if (relativeFilePaths != null)
         {
-            foreach (var relPath in relativeFilePaths)
+            foreach (var rel in relativeFilePaths)
             {
-                string fullPath = Path.Combine(Application.dataPath, relPath);
-                if (File.Exists(fullPath))
-                {
-                    try
-                    {
-                        byte[] bytes = File.ReadAllBytes(fullPath);
-                        Texture2D tex = new Texture2D(2, 2, TextureFormat.RGBA32, false);
-                        if (tex.LoadImage(bytes))
-                        {
-                            return Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f), 100f);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Debug.LogWarning($"[HazardVisualManager] Failed loading disk texture '{fullPath}': {ex.Message}");
-                    }
-                }
-            }
-        }
-
-        // Direct search in MainScene/Sprite and Resources
-        string cleanBase = Path.GetFileNameWithoutExtension(resourcePath);
-        string[] searchFolders = new[]
-        {
-            Path.Combine(Application.dataPath, "MainScene", "Sprite"),
-            Path.Combine(Application.dataPath, "MainScene", "Sprite", "Hazards"),
-            Path.Combine(Application.dataPath, "MainScene", "Sprite", "Story"),
-            Path.Combine(Application.dataPath, "Resources", "Hazards")
-        };
-
-        foreach (var dir in searchFolders)
-        {
-            if (!Directory.Exists(dir)) continue;
-
-            var files = Directory.GetFiles(dir);
-            foreach (var f in files)
-            {
-                if (f.EndsWith(".meta", StringComparison.OrdinalIgnoreCase)) continue;
-                string fName = Path.GetFileNameWithoutExtension(f);
-                if (NormalizeName(fName) == NormalizeName(cleanBase) || fName.IndexOf(cleanBase, StringComparison.OrdinalIgnoreCase) >= 0)
-                {
-                    try
-                    {
-                        byte[] bytes = File.ReadAllBytes(f);
-                        Texture2D tex = new Texture2D(2, 2, TextureFormat.RGBA32, false);
-                        if (tex.LoadImage(bytes))
-                        {
-                            return Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f), 100f);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Debug.LogWarning($"[HazardVisualManager] Failed loading disk texture '{f}': {ex.Message}");
-                    }
-                }
+                s = LoadHazardSprite(rel);
+                if (s != null) return s;
             }
         }
 
         return null;
-    }
-
-    private static string NormalizeName(string str)
-    {
-        if (string.IsNullOrEmpty(str)) return "";
-        return str.Replace("ü", "u").Replace("ş", "s").Replace("ç", "c").Replace("ı", "i").ToLowerInvariant().Trim();
-    }
-
-    private Sprite LoadFallbackSprite(string title)
-    {
-        return LoadProjectSprite("Story/1000000104", new[] { "MainScene/Sprite/Story/1000000104.png", "Scenes/1000000106.png" }) ?? GetSolidSprite();
-    }
-
-    private static Sprite s_solidSprite;
-    private static Sprite GetSolidSprite()
-    {
-        if (s_solidSprite != null) return s_solidSprite;
-        Texture2D tex = new Texture2D(2, 2, TextureFormat.RGBA32, false);
-        Color[] p = { Color.white, Color.white, Color.white, Color.white };
-        tex.SetPixels(p);
-        tex.Apply();
-        s_solidSprite = Sprite.Create(tex, new Rect(0, 0, 2, 2), new Vector2(0.5f, 0.5f), 1f);
-        return s_solidSprite;
-    }
-
-    private static Sprite s_vignetteSprite;
-    private static Sprite GetVignetteSprite()
-    {
-        if (s_vignetteSprite != null) return s_vignetteSprite;
-        int w = 256;
-        int h = 144;
-        Texture2D tex = new Texture2D(w, h, TextureFormat.RGBA32, false);
-        for (int y = 0; y < h; y++)
-        {
-            for (int x = 0; x < w; x++)
-            {
-                float u = (float)x / w;
-                float v = (float)y / h;
-                float edgeDist = Mathf.Min(u, 1f - u, v, 1f - v) * 2.2f;
-                float vig = Mathf.Clamp01(1f - edgeDist);
-                tex.SetPixel(x, y, new Color(1f, 1f, 1f, vig * vig));
-            }
-        }
-        tex.Apply();
-        s_vignetteSprite = Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), 100f);
-        return s_vignetteSprite;
-    }
-
-    // -----------------------------------------------------------------------------------------
-    // BACKWARDS COMPATIBILITY INTERFACES
-    // -----------------------------------------------------------------------------------------
-
-    /// <summary>
-    /// Legacy compatibility method for existing scripts referencing SwitchInteraction wrappers.
-    /// </summary>
-    public SwitchInteraction GetHazard(string educationalReason)
-    {
-        // Simply ensure HazardVisualManager is active; this method is kept so old call sites compile cleanly
-        return null;
-    }
-
-    /// <summary>
-    /// Legacy compatibility method to trigger hazard visual.
-    /// </summary>
-    public bool TriggerHazard(string educationalReason)
-    {
-        ShowHazardVisual(educationalReason, () =>
-        {
-            if (GameTimelineManager.Instance != null)
-            {
-                GameTimelineManager.Instance.TriggerRewind(educationalReason, isFromVisual: true);
-            }
-        });
-        return true;
     }
 }
