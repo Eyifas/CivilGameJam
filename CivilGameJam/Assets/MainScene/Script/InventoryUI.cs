@@ -6,6 +6,10 @@ public class InventoryUI : MonoBehaviour
 {
     [SerializeField] private Image[] itemIcons;
 
+    [Header("Hotbar Panel Setup")]
+    [SerializeField] private Image panelImage;
+    [SerializeField] private Sprite panelSprite;
+
     [Header("Item Sprites")]
     [SerializeField] private Sprite hammerSprite;
     [SerializeField] private Sprite vidaSprite;
@@ -20,11 +24,13 @@ public class InventoryUI : MonoBehaviour
     private void Awake()
     {
         EnsureValidFlashlightSprite();
+        ConfigureHotbarLayout();
         SetupSlotDraggers();
     }
 
     private void Start()
     {
+        ConfigureHotbarLayout();
         SetupSlotDraggers();
         UpdateInventoryUI();
     }
@@ -242,6 +248,153 @@ public class InventoryUI : MonoBehaviour
         rt.sizeDelta = new Vector2(90f, 90f);
 
         dragGhost.SetActive(false);
+    }
+
+    public void ConfigureHotbarLayout()
+    {
+        // 1. Configure panel background image
+        if (panelImage == null) panelImage = GetComponent<Image>();
+        if (panelImage != null)
+        {
+            Sprite spr = panelSprite ?? GetPanelSprite();
+            if (spr != null)
+            {
+                panelImage.sprite = spr;
+            }
+            panelImage.color = Color.white;
+            panelImage.preserveAspect = true;
+            panelImage.type = Image.Type.Simple;
+        }
+
+        // 2. Position hotbar at center of very bottom of the screen (like Minecraft)
+        RectTransform rt = GetComponent<RectTransform>();
+        if (rt != null)
+        {
+            rt.anchorMin = new Vector2(0.5f, 0f);
+            rt.anchorMax = new Vector2(0.5f, 0f);
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.sizeDelta = new Vector2(472f, 136f);
+            rt.anchoredPosition = new Vector2(0f, 78f);
+        }
+
+        // 3. Ensure 5 slots exist
+        float[] slotXOffsets = new float[] { -171f, -85f, 0f, 85f, 171f };
+        if (itemIcons != null && itemIcons.Length == 4 && itemIcons[3] != null)
+        {
+            Transform existingSlot5 = transform.Find("Item5");
+            GameObject slot5Obj = existingSlot5 != null ? existingSlot5.gameObject : Instantiate(itemIcons[3].gameObject, transform);
+            slot5Obj.name = "Item5";
+            slot5Obj.SetActive(false);
+            Image slot5Img = slot5Obj.GetComponent<Image>();
+
+            List<Image> iconList = new List<Image>(itemIcons);
+            if (!iconList.Contains(slot5Img))
+            {
+                iconList.Add(slot5Img);
+                itemIcons = iconList.ToArray();
+            }
+
+            InventorySelection invSel = GetComponent<InventorySelection>();
+            if (invSel != null)
+            {
+                invSel.RegisterAdditionalSlot(slot5Obj.GetComponent<RectTransform>());
+            }
+        }
+
+        // 4. Align all slots to match the wooden boxes of panel.png
+        if (itemIcons != null)
+        {
+            for (int i = 0; i < itemIcons.Length && i < slotXOffsets.Length; i++)
+            {
+                if (itemIcons[i] == null) continue;
+                RectTransform slotRt = itemIcons[i].rectTransform;
+                if (slotRt != null)
+                {
+                    slotRt.anchorMin = new Vector2(0.5f, 0.5f);
+                    slotRt.anchorMax = new Vector2(0.5f, 0.5f);
+                    slotRt.pivot = new Vector2(0.5f, 0.5f);
+                    slotRt.anchoredPosition = new Vector2(slotXOffsets[i], 0f);
+                    slotRt.sizeDelta = new Vector2(52f, 52f);
+                    slotRt.localScale = Vector3.one;
+                }
+                itemIcons[i].preserveAspect = true;
+            }
+        }
+    }
+
+    private static Sprite s_panelSprite;
+    public static Sprite GetPanelSprite()
+    {
+        if (s_panelSprite != null) return s_panelSprite;
+
+        // 1. Try Resources.Load
+        s_panelSprite = Resources.Load<Sprite>("UI/panel") ?? Resources.Load<Sprite>("panel");
+        if (s_panelSprite != null) return s_panelSprite;
+
+        var allRes = Resources.LoadAll<Sprite>("UI/panel");
+        if (allRes != null && allRes.Length > 0 && allRes[0] != null)
+        {
+            s_panelSprite = allRes[0];
+            return s_panelSprite;
+        }
+
+#if UNITY_EDITOR
+        // 2. Try AssetDatabase in Editor
+        string[] paths = new[]
+        {
+            "Assets/MainScene/panel.png",
+            "Assets/Resources/UI/panel.png",
+            "Assets/Resources/panel.png"
+        };
+        foreach (var p in paths)
+        {
+            var s = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>(p);
+            if (s != null)
+            {
+                s_panelSprite = s;
+                return s_panelSprite;
+            }
+            var allS = UnityEditor.AssetDatabase.LoadAllAssetsAtPath(p);
+            if (allS != null)
+            {
+                foreach (var a in allS)
+                {
+                    if (a is Sprite spr)
+                    {
+                        s_panelSprite = spr;
+                        return s_panelSprite;
+                    }
+                }
+            }
+        }
+#endif
+
+        // 3. Fallback: load directly from disk bytes
+        string diskPath = System.IO.Path.Combine(Application.dataPath, "MainScene/panel.png");
+        if (!System.IO.File.Exists(diskPath))
+        {
+            diskPath = System.IO.Path.Combine(Application.dataPath, "Resources/UI/panel.png");
+        }
+        if (System.IO.File.Exists(diskPath))
+        {
+            try
+            {
+                byte[] data = System.IO.File.ReadAllBytes(diskPath);
+                Texture2D tex = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+                tex.filterMode = FilterMode.Point;
+                if (tex.LoadImage(data))
+                {
+                    Rect rect = (tex.width == 256 && tex.height == 256)
+                        ? new Rect(10, 94, 236, 68)
+                        : new Rect(0, 0, tex.width, tex.height);
+                    s_panelSprite = Sprite.Create(tex, rect, new Vector2(0.5f, 0.5f), 100f);
+                    return s_panelSprite;
+                }
+            }
+            catch { }
+        }
+
+        return null;
     }
 
     private void EnsureValidFlashlightSprite()
