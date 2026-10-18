@@ -634,8 +634,8 @@ MonoBehaviour:
   storySprites:
   - {fileID: -855298285791758126, guid: 69665a1a607b1408f8063dc087886276, type: 3}
   - {fileID: 2165999173084558408, guid: 30fc49b416fe248ef9256ccbcf5cc68c, type: 3}
-  - {fileID: 6937817954938267909, guid: 4db2813486a7a4b8796d96c96ba8fa02, type: 3}
-  - {fileID: -3961465300801055527, guid: bd7183c4d63ac4e679a28307429be36a, type: 3}
+  - {fileID: 2845491494293411322, guid: 28e0b30d14755446e9b148f99d988bab, type: 3}
+  - {fileID: 8258168405479302821, guid: 1522d50f4bc8d4a9aaae7a1f5ef3a09d, type: 3}
   startSceneName: StartScene
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
