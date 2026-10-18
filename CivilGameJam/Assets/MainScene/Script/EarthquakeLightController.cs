@@ -3,6 +3,8 @@ using UnityEngine.Rendering.Universal;
 
 public class EarthquakeLightController : MonoBehaviour
 {
+    public static EarthquakeLightController Instance { get; private set; }
+
     [SerializeField] private Light2D globalLight;
 
     [Header("Light Settings")]
@@ -10,17 +12,48 @@ public class EarthquakeLightController : MonoBehaviour
     [SerializeField] private float flickerInterval = 0.08f;
 
     private float flickerTimer;
+    private bool isCustomControlled = false;
+
+    public float NormalIntensity => normalIntensity;
+    public Light2D GlobalLight => globalLight;
 
     private void Awake()
     {
+        Instance = this;
         if (globalLight == null)
         {
             globalLight = GetComponent<Light2D>();
         }
     }
 
+    private void OnDestroy()
+    {
+        if (Instance == this)
+        {
+            Instance = null;
+        }
+    }
+
+    public void SetCustomControlled(bool custom)
+    {
+        isCustomControlled = custom;
+    }
+
+    public void SetLightIntensity(float intensity)
+    {
+        if (globalLight != null)
+        {
+            globalLight.intensity = intensity;
+        }
+    }
+
     private void Update()
     {
+        if (isCustomControlled)
+        {
+            return;
+        }
+
         if (GameTimelineManager.Instance == null || globalLight == null)
         {
             return;

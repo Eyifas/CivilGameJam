@@ -64,7 +64,8 @@ public class TodoListUI : MonoBehaviour
     public static void EnsureTodoListUI()
     {
         string sceneName = SceneManager.GetActiveScene().name;
-        if (sceneName == "StartScene")
+        // Mini games (interactions), menus, and end scene should never show TodoListUI
+        if (sceneName != "MainScene")
         {
             if (Instance != null && Instance.panelRoot != null)
             {
@@ -109,6 +110,15 @@ public class TodoListUI : MonoBehaviour
         }
     }
 
+    public static bool HasExploredRooms => s_hasExploredRooms;
+    public static bool HasCheckedDrawers => s_hasCheckedDrawers;
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void OnSubsystemRegistration()
+    {
+        ResetExplorationState();
+    }
+
     public static void ResetExplorationState()
     {
         s_hasExploredRooms = false;
@@ -116,6 +126,23 @@ public class TodoListUI : MonoBehaviour
         s_visitedRooms.Clear();
         s_totalDistanceMoved = 0f;
         s_hasLastPos = false;
+        if (Instance != null)
+        {
+            Instance.prevLookAround = false;
+            Instance.RefreshTodoList();
+        }
+    }
+
+    public static void RestoreExplorationState(bool explored, bool checkedDrawers)
+    {
+        s_hasExploredRooms = explored;
+        s_hasCheckedDrawers = checkedDrawers;
+        s_hasLastPos = false;
+        if (Instance != null)
+        {
+            Instance.prevLookAround = explored && checkedDrawers;
+            Instance.RefreshTodoList();
+        }
     }
 
     public static void RegisterDrawerChecked()
@@ -127,12 +154,12 @@ public class TodoListUI : MonoBehaviour
     {
         if (s_hasCheckedDrawers) return true;
 
+        // Drawer items exclusive to DrawerScene
         if (InventoryManager.HasItem("Hammer") ||
             InventoryManager.HasItem("Vida") ||
             InventoryManager.HasItem("Screw") ||
             InventoryManager.HasItem("Nail") ||
             InventoryManager.HasItem("Nails") ||
-            InventoryManager.HasItem("Flashlight") ||
             InventoryManager.HasItem("Anahtar"))
         {
             s_hasCheckedDrawers = true;
@@ -154,6 +181,18 @@ public class TodoListUI : MonoBehaviour
         LoadBackgroundSprite();
         BuildUIHierarchy();
         ApplyLayoutSettings();
+
+        // Fresh start in Stage 1 should always begin with reset exploration state
+        if (GameTimelineManager.Instance == null || GameTimelineManager.Instance.CurrentStage <= GameStage.Stage1_Preparation)
+        {
+            ResetExplorationState();
+        }
+
+        // Immediately hide if loaded or instantiated in a mini game / non-MainScene
+        if (SceneManager.GetActiveScene().name != "MainScene" && panelRoot != null)
+        {
+            panelRoot.SetActive(false);
+        }
     }
 
     private void OnEnable()
@@ -214,6 +253,13 @@ public class TodoListUI : MonoBehaviour
             }
         }
 
+        // Immediately hide in mini game scenes / menus
+        if (scene.name != "MainScene")
+        {
+            if (panelRoot != null) panelRoot.SetActive(false);
+            return;
+        }
+
         RefreshTodoList();
     }
 
@@ -263,6 +309,16 @@ public class TodoListUI : MonoBehaviour
 
     private void Update()
     {
+        // Mini games (interactions), menus, and end scene should never show TodoListUI
+        if (SceneManager.GetActiveScene().name != "MainScene")
+        {
+            if (panelRoot != null && panelRoot.activeSelf)
+            {
+                panelRoot.SetActive(false);
+            }
+            return;
+        }
+
         TrackPlayerExploration();
         RefreshTodoList();
     }
@@ -311,15 +367,47 @@ public class TodoListUI : MonoBehaviour
         }
     }
 
+    public static void SetTodoListVisible(bool visible)
+    {
+        if (Instance != null && Instance.panelRoot != null)
+        {
+            if (Instance.panelRoot.activeSelf != visible)
+            {
+                Instance.panelRoot.SetActive(visible);
+            }
+        }
+    }
+
     public void RefreshTodoList()
     {
-        var timeline = GameTimelineManager.Instance;
         string activeScene = SceneManager.GetActiveScene().name;
 
-        // Disappear in StartScene, during active earthquake (Stage 2 Tremor), or during Rewind
-        if (timeline == null || activeScene == "StartScene")
+        // User requirement: Todo list must NOT be visible in mini games (interactions) or menus
+        // Only visible when actively exploring the apartment in MainScene
+        if (activeScene != "MainScene")
         {
-            if (panelRoot != null) panelRoot.SetActive(false);
+            if (panelRoot != null && panelRoot.activeSelf) panelRoot.SetActive(false);
+            return;
+        }
+
+        // Hide during in-scene QTE mini games or interactions
+        if (QTEManager.Instance != null && QTEManager.Instance.IsAnyQTEActive)
+        {
+            if (panelRoot != null && panelRoot.activeSelf) panelRoot.SetActive(false);
+            return;
+        }
+
+        // Hide during hazard cutscene / death / comic visual
+        if (SwitchInteraction.IsAnyHazardActive)
+        {
+            if (panelRoot != null && panelRoot.activeSelf) panelRoot.SetActive(false);
+            return;
+        }
+
+        var timeline = GameTimelineManager.Instance;
+        if (timeline == null)
+        {
+            if (panelRoot != null && panelRoot.activeSelf) panelRoot.SetActive(false);
             return;
         }
 
@@ -328,14 +416,14 @@ public class TodoListUI : MonoBehaviour
         // User requirement: "after that it will disappear during the earthquake"
         if (stage == GameStage.Stage2_Tremor || stage == GameStage.Rewinding)
         {
-            if (panelRoot != null) panelRoot.SetActive(false);
+            if (panelRoot != null && panelRoot.activeSelf) panelRoot.SetActive(false);
             return;
         }
 
         // Stage 1 (Preparation)
         if (stage == GameStage.Stage1_Preparation)
         {
-            if (panelRoot != null) panelRoot.SetActive(true);
+            if (panelRoot != null && !panelRoot.activeSelf) panelRoot.SetActive(true);
             RenderStage1();
             return;
         }
@@ -343,13 +431,13 @@ public class TodoListUI : MonoBehaviour
         // Stage 3 & Beyond (Post-Earthquake Utilities till the end of the game)
         if (stage >= GameStage.Stage3_Utilities)
         {
-            if (panelRoot != null) panelRoot.SetActive(true);
+            if (panelRoot != null && !panelRoot.activeSelf) panelRoot.SetActive(true);
             RenderStage3();
             return;
         }
 
         // Any other state
-        if (panelRoot != null) panelRoot.SetActive(false);
+        if (panelRoot != null && panelRoot.activeSelf) panelRoot.SetActive(false);
     }
 
     private void RenderStage1()
@@ -574,10 +662,10 @@ public class TodoListUI : MonoBehaviour
 
         // Tan parchment box offsets in the 477x184 wooden sign
         tRect.offsetMin = new Vector2(66f, 26f);
-        tRect.offsetMax = new Vector2(-64f, -86f);
+        tRect.offsetMax = new Vector2(-64f, -112f);
 
         tasksText = tasksObj.AddComponent<TextMeshProUGUI>();
-        tasksText.fontSize = 15.5f;
+        tasksText.fontSize = 20f;
         tasksText.fontStyle = FontStyles.Bold;
         tasksText.color = new Color(0.15f, 0.08f, 0.03f, 1f); // Dark rich brown ink on parchment
         tasksText.alignment = TextAlignmentOptions.MidlineLeft;

@@ -119,6 +119,7 @@ public class StartMenuController : MonoBehaviour
         InventorySelection.ResetSelection();
         PlayerMovement.ClearSavedPosition();
         SwitchInteraction.IsAnyHazardActive = false;
+        TodoListUI.ResetExplorationState();
 
         Time.timeScale = 1f;
 

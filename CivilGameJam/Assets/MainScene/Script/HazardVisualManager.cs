@@ -151,7 +151,7 @@ public class HazardVisualManager : MonoBehaviour
                 matchKeywords = new[] { "cabinet fell", "shifting cabinet", "overhead obstacles" },
                 educationalReason = "FATAL INJURY: The shifting cabinet fell on you during the aftershock! React quickly to secure loose overhead obstacles!",
                 rewindDuration = 5f,
-                resourcePath = "Hazards/hazard_cabinet_fall"
+                resourcePath = "Hazards/1000000104"
             },
 
             // 6. Stage 3 - Heavy wardrobe / dolap collapse (To be added)
@@ -162,7 +162,7 @@ public class HazardVisualManager : MonoBehaviour
                 matchKeywords = new[] { "wardrobe", "dolap", "crushed", "fell on you" },
                 educationalReason = "WARDROBE COLLAPSE: The heavy unanchored wardrobe toppled over and crushed you! Always lift or secure fallen obstacles before moving forward!",
                 rewindDuration = 5f,
-                resourcePath = "Hazards/hazard_wardrobe_fall"
+                resourcePath = "Hazards/1000000104"
             },
 
             // 7. Stage 3 - Light switch spark explosion (explosion)
@@ -184,7 +184,7 @@ public class HazardVisualManager : MonoBehaviour
                 matchKeywords = new[] { "gas valve in total darkness", "packed flashlight is essential", "broken fixtures" },
                 educationalReason = "IN THE DARK: You couldn't locate the gas valve in total darkness and tripped over broken fixtures! A packed flashlight is essential for utility shut-off!",
                 rewindDuration = 15f,
-                resourcePath = "Hazards/comic_panel_3_gas_leak"
+                resourcePath = "Hazards/1000000139"
             },
 
             // 9. Stage 3 - Gas leak timeout (comic 3)
@@ -192,66 +192,22 @@ public class HazardVisualManager : MonoBehaviour
             {
                 id = "Hazard_GasTimeout",
                 title = "TOXIC GAS SUFFOCATION",
-                matchKeywords = new[] { "Lingered too long", "leaking natural gas" },
+                matchKeywords = new[] { "leaking natural gas", "toxic gas", "gas suffocation" },
                 educationalReason = "TIME RAN OUT: Lingered too long in an apartment with leaking natural gas!",
                 rewindDuration = 15f,
-                resourcePath = "Hazards/comic_panel_3_gas_leak"
+                resourcePath = "Hazards/1000000139"
             },
 
-            // 10. Stage 4 - Tripped over stairs planter (To be added)
+            // 10. Stage 3 - Timeout without exiting the building (comic 3)
             new HazardConfig
             {
-                id = "Hazard_StairsPlanter",
-                title = "STAIRS PLANTER FALL",
-                matchKeywords = new[] { "heavy planter", "fell down the stairs" },
-                educationalReason = "INJURY: In total darkness without a flashlight, you tripped over the heavy planter and fell down the stairs!",
+                id = "Hazard_Timeout",
+                title = "Building Collapsed",
+                matchKeywords = new[] { "Lingered too long", "Building Collapsed", "Building Collapse", "without exiting", "structural weakening" },
+                educationalReason = "TIME RAN OUT: Lingered too long in an apartment!",
                 rewindDuration = 15f,
-                resourcePath = "Hazards/hazard_stairs_fall"
+                resourcePath = "Hazards/1000000142"
             },
-
-            // 11. Stage 4 - Blind search for neighbor in dark corridor (comic 3)
-            new HazardConfig
-            {
-                id = "Hazard_CorridorSearch",
-                title = "BLIND CORRIDOR SEARCH",
-                matchKeywords = new[] { "Mr. Ahmet", "BLIND SEARCH", "dark corridor" },
-                educationalReason = "BLIND SEARCH: Without a flashlight, you couldn't locate or treat Mr. Ahmet in the dark corridor.",
-                rewindDuration = 15f,
-                resourcePath = "Hazards/comic_panel_3_gas_leak"
-            },
-
-            // 12. Stage 5 - Falling storefront facade (To be added)
-            new HazardConfig
-            {
-                id = "Hazard_StreetFacade",
-                title = "FALLING STOREFRONT FACADE",
-                matchKeywords = new[] { "storefront facade", "falling facade", "overhead hazards" },
-                educationalReason = "FATAL TRAUMA: Struck by falling storefront facade! Watch overhead hazards when stepping into the street!",
-                rewindDuration = 5f,
-                resourcePath = "Hazards/hazard_street_facade"
-            },
-
-            // 13. Stage 5 - Mountain road gridlock in car (To be added)
-            new HazardConfig
-            {
-                id = "Hazard_CarGridlock",
-                title = "MOUNTAIN ROAD GRIDLOCK",
-                matchKeywords = new[] { "gridlocked", "GRIDLOCK TRAP", "Stay out of cars", "mountain road" },
-                educationalReason = "GRIDLOCK TRAP: You and hundreds of panicked drivers gridlocked the mountain road, blocking emergency rescue vehicles! Stay out of cars!",
-                rewindDuration = 5f,
-                resourcePath = "Hazards/hazard_car_gridlock"
-            },
-
-            // 14. Stage 5 - Tsunami hazard (comic 4)
-            new HazardConfig
-            {
-                id = "Hazard_TsunamiEnding",
-                title = "TSUNAMI ZONE",
-                matchKeywords = new[] { "tsunami", "coast", "wave" },
-                educationalReason = "TSUNAMI HAZARD: Moving towards the sea or coastline after a major undersea earthquake is lethal! Move immediately to high ground!",
-                rewindDuration = 5f,
-                resourcePath = "Hazards/comic_panel_4_tsunami_ending"
-            }
         };
     }
 

@@ -34,6 +34,8 @@ public struct TimelineSnapshot
     public bool isFlashlightEquipped;
     public bool hasFirstAidKit;
     public List<string> inventoryItems;
+    public bool hasExploredRooms;
+    public bool hasCheckedDrawers;
 
     // Stage 3
     public bool isCabinetSecured;
@@ -122,6 +124,15 @@ public class GameTimelineManager : MonoBehaviour
     [SerializeField] private RoomCamera roomCamera;
     [SerializeField] private WorldChoiceGroup stage2ChoiceGroup;
     [SerializeField] private PlayerMovement playerMovement;
+
+    [Header("Stage 2 Desk Cover Visuals")]
+    [SerializeField] private Sprite crouchSprite;
+    [Tooltip("Vertical offset for fine-tuning crouching character under the desk")]
+    [SerializeField] private float crouchYOffset = -0.8f;
+    [Tooltip("Horizontal offset for fine-tuning crouching character under the desk")]
+    [SerializeField] private float crouchXOffset = 0f;
+    private GameObject activeCrouchVisual;
+    private Coroutine deskCoverCoroutine;
 
     // Events
     public event Action<GameStage> OnStageChanged;
@@ -358,6 +369,8 @@ public class GameTimelineManager : MonoBehaviour
             isFlashlightEquipped = PlayerMovement.IsFlashlightEquipped,
             hasFirstAidKit = hasFirstAidKit,
             inventoryItems = InventoryManager.GetItemsCopy(),
+            hasExploredRooms = TodoListUI.HasExploredRooms,
+            hasCheckedDrawers = TodoListUI.HasCheckedDrawers,
 
             isCabinetSecured = isCabinetSecured,
             isDolapSecured = isDolapSecured,
@@ -417,6 +430,7 @@ public class GameTimelineManager : MonoBehaviour
 
         if (actionHistory.Count == 0)
         {
+            TodoListUI.ResetExplorationState();
             RecordActionSnapshot("Stage 1 Initial Start");
         }
 
@@ -598,7 +612,8 @@ public class GameTimelineManager : MonoBehaviour
             {
                 // Survived safely!
                 Debug.Log("<color=green>[Timeline] Survived the tremor safely under the desk!</color>");
-                StartCoroutine(TransitionToStage3Sequence());
+                if (deskCoverCoroutine != null) StopCoroutine(deskCoverCoroutine);
+                deskCoverCoroutine = StartCoroutine(DeskCoverSequence());
             }
         }
         else if (choseDoor)
@@ -617,11 +632,246 @@ public class GameTimelineManager : MonoBehaviour
         TriggerRewind("TIME RAN OUT: Frozen in panic! In an earthquake, drop under sturdy furniture within seconds before violent shaking knocks you down!");
     }
 
-    private IEnumerator TransitionToStage3Sequence()
+    private IEnumerator DeskCoverSequence()
     {
+        if (stage2ChoiceGroup != null)
+        {
+            stage2ChoiceGroup.gameObject.SetActive(false);
+        }
+
+        GameObject deskObj = GameObject.Find("Masa");
+        Vector3 deskPos = deskObj != null ? deskObj.transform.position : new Vector3(-15.16f, -1.777f, 0f);
+
+        var lightCtrl = EarthquakeLightController.Instance ?? FindFirstObjectByType<EarthquakeLightController>();
+        if (lightCtrl != null)
+        {
+            lightCtrl.SetCustomControlled(true);
+        }
+
+        if (roomCamera != null)
+        {
+            roomCamera.StartScreenShake(duration: 5.0f, strength: 0.18f);
+        }
+
+        SetObjectiveText("EARTHQUAKE: Covering under the desk! Hold on!");
+
+        float normalLight = lightCtrl != null ? lightCtrl.NormalIntensity : 1f;
+
+        // 1. Shaking with electricity on briefly
+        if (lightCtrl != null) lightCtrl.SetLightIntensity(normalLight);
+        yield return new WaitForSeconds(0.4f);
+
+        // 2. Electricity goes OFF during the earthquake (blackout!)
+        if (lightCtrl != null) lightCtrl.SetLightIntensity(0f);
+        AudioManager.PlaySFX(SFXType.LightSwitch);
+
+        // "once the electricity is off we need to hide the main charachter and use seests\mainscene\sprite\karakter\çömleme"
+        if (playerMovement != null)
+        {
+            playerMovement.SetCharacterHidden(true);
+            playerMovement.Teleport(new Vector3(deskPos.x, -2.08f, 0f));
+        }
+
+        ShowCrouchingCharacter(deskPos);
+
+        yield return new WaitForSeconds(0.35f);
+
+        // 3. Electricity flickers back ON: The player is seen crouching under the desk!
+        if (lightCtrl != null) lightCtrl.SetLightIntensity(normalLight);
+        AudioManager.PlaySFX(SFXType.LightSwitch);
+        yield return new WaitForSeconds(0.85f);
+
+        // 4. Electricity continues to flicker on and off during the earthquake
+        if (lightCtrl != null) lightCtrl.SetLightIntensity(0f);
+        yield return new WaitForSeconds(0.18f);
+
+        if (lightCtrl != null) lightCtrl.SetLightIntensity(normalLight);
+        yield return new WaitForSeconds(0.25f);
+
+        if (lightCtrl != null) lightCtrl.SetLightIntensity(0f);
+        yield return new WaitForSeconds(0.15f);
+
+        if (lightCtrl != null) lightCtrl.SetLightIntensity(normalLight);
+        yield return new WaitForSeconds(0.3f);
+
+        // 5. Total blackout as the tremor subsides
+        if (lightCtrl != null) lightCtrl.SetLightIntensity(0f);
+        AudioManager.PlaySFX(SFXType.LightSwitch);
         SetObjectiveText("Main tremor subsides... Power cuts out! Total darkness.");
-        yield return new WaitForSeconds(2.0f);
+
+        yield return new WaitForSeconds(1.0f);
+
+        // 6. Earthquake ends -> "then once the earthquake ends we will return it to the normal"
+        if (roomCamera != null)
+        {
+            roomCamera.StopEarthquake();
+        }
+
+        HideCrouchingCharacter();
+
+        if (playerMovement != null)
+        {
+            playerMovement.SetCharacterHidden(false);
+            playerMovement.enabled = true;
+        }
+
+        if (lightCtrl != null)
+        {
+            lightCtrl.SetCustomControlled(false);
+        }
+
+        deskCoverCoroutine = null;
+
+        // 7. Transition to Stage 3
         StartStage3();
+    }
+
+    private void ShowCrouchingCharacter(Vector3 deskPos)
+    {
+        HideCrouchingCharacter();
+
+        Sprite sprite = LoadCrouchSprite();
+        if (sprite == null)
+        {
+            Debug.LogWarning("[Timeline] Crouch sprite not found!");
+            return;
+        }
+
+        activeCrouchVisual = new GameObject("CrouchingPlayer_UnderDesk");
+
+        Vector3 playerScale = (playerMovement != null) ? playerMovement.transform.localScale : new Vector3(2.95f, 2.95f, 2.95f);
+        activeCrouchVisual.transform.localScale = playerScale;
+
+        var sr = activeCrouchVisual.AddComponent<SpriteRenderer>();
+        sr.sprite = sprite;
+
+        // Ground level is at y = -3.35f in MainScene.
+        float targetFloorY = -3.35f;
+        float bottomOffset = sprite.bounds.min.y * playerScale.y;
+        float spawnY = targetFloorY - bottomOffset + crouchYOffset;
+
+        float centerOffset = sprite.bounds.center.x * playerScale.x;
+        float spawnX = deskPos.x - centerOffset + crouchXOffset;
+
+        activeCrouchVisual.transform.position = new Vector3(spawnX, spawnY, 0f);
+
+        // Sorting: Under desk. Table (Masa) has sortingOrder = 8.
+        // Putting crouching character at sortingOrder = 7 renders them behind the tabletop/legs but in front of room background.
+        if (playerMovement != null)
+        {
+            var pSr = playerMovement.GetComponentInChildren<SpriteRenderer>();
+            if (pSr != null)
+            {
+                sr.sortingLayerID = pSr.sortingLayerID;
+                sr.material = pSr.material;
+            }
+        }
+        sr.sortingOrder = 7;
+    }
+
+    private void HideCrouchingCharacter()
+    {
+        if (activeCrouchVisual != null)
+        {
+            Destroy(activeCrouchVisual);
+            activeCrouchVisual = null;
+        }
+    }
+
+    private Sprite LoadCrouchSprite()
+    {
+        if (crouchSprite != null) return crouchSprite;
+
+#if UNITY_EDITOR
+        var allSprites = UnityEditor.AssetDatabase.LoadAllAssetsAtPath("Assets/MainScene/Sprite/karakter/çömelme.png");
+        if (allSprites != null)
+        {
+            foreach (var obj in allSprites)
+            {
+                if (obj is Sprite s)
+                {
+                    crouchSprite = s;
+                    return crouchSprite;
+                }
+            }
+        }
+#endif
+
+        var allResComelme = Resources.LoadAll<Sprite>("comelme");
+        if (allResComelme != null && allResComelme.Length > 0)
+        {
+            crouchSprite = allResComelme[0];
+            return crouchSprite;
+        }
+
+        var allResTr = Resources.LoadAll<Sprite>("çömelme");
+        if (allResTr != null && allResTr.Length > 0)
+        {
+            crouchSprite = allResTr[0];
+            return crouchSprite;
+        }
+
+        var singleRes = Resources.Load<Sprite>("comelme") ?? Resources.Load<Sprite>("çömelme");
+        if (singleRes != null)
+        {
+            crouchSprite = singleRes;
+            return crouchSprite;
+        }
+
+        try
+        {
+            string[] possiblePaths = new string[]
+            {
+                System.IO.Path.Combine(Application.dataPath, "MainScene/Sprite/karakter/çömelme.png"),
+                System.IO.Path.Combine(Application.dataPath, "MainScene/Sprite/karakter/comelme.png"),
+                System.IO.Path.Combine(Application.dataPath, "Resources/çömelme.png"),
+                System.IO.Path.Combine(Application.dataPath, "Resources/comelme.png")
+            };
+
+            foreach (string p in possiblePaths)
+            {
+                if (System.IO.File.Exists(p))
+                {
+                    byte[] bytes = System.IO.File.ReadAllBytes(p);
+                    Texture2D tex = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+                    tex.filterMode = FilterMode.Point;
+                    if (tex.LoadImage(bytes))
+                    {
+                        Rect r = new Rect(78, 39, 96, 143);
+                        crouchSprite = Sprite.Create(tex, r, new Vector2(0.5f, 0f), 100f);
+                        return crouchSprite;
+                    }
+                }
+            }
+        }
+        catch (System.Exception ex)
+        {
+            Debug.LogWarning("[Timeline] Could not load crouch sprite via bytes: " + ex.Message);
+        }
+
+        return null;
+    }
+
+    private void CleanupDeskCoverState()
+    {
+        if (deskCoverCoroutine != null)
+        {
+            StopCoroutine(deskCoverCoroutine);
+            deskCoverCoroutine = null;
+        }
+
+        HideCrouchingCharacter();
+
+        if (playerMovement != null)
+        {
+            playerMovement.SetCharacterHidden(false);
+        }
+
+        var lightCtrl = EarthquakeLightController.Instance ?? FindFirstObjectByType<EarthquakeLightController>();
+        if (lightCtrl != null)
+        {
+            lightCtrl.SetCustomControlled(false);
+        }
     }
 
     #endregion
@@ -924,6 +1174,7 @@ public class GameTimelineManager : MonoBehaviour
             playerMovement.TurnOffAllLights();
             playerMovement.enabled = false;
         }
+        CleanupDeskCoverState();
         InventorySelection.ResetSelection();
         if (QTEManager.Instance != null) QTEManager.Instance.CancelAll();
         if (roomCamera != null) roomCamera.StopEarthquake();
@@ -978,6 +1229,7 @@ public class GameTimelineManager : MonoBehaviour
             playerMovement.TurnOffAllLights();
             playerMovement.enabled = false;
         }
+        CleanupDeskCoverState();
         InventorySelection.ResetSelection();
         if (QTEManager.Instance != null) QTEManager.Instance.CancelAll();
         if (roomCamera != null) roomCamera.StopEarthquake();
@@ -1056,6 +1308,7 @@ public class GameTimelineManager : MonoBehaviour
         // 3. Restore inventory items
         InventoryManager.SetItems(snapshot.inventoryItems);
         InventorySelection.ResetSelection();
+        TodoListUI.RestoreExplorationState(snapshot.hasExploredRooms, snapshot.hasCheckedDrawers);
 
         // 4. Physical / Visual restoration of room objects
         // (a) Restore RoomItemInteractable items (Painting, Flashlight, Medkit)
@@ -1107,6 +1360,7 @@ public class GameTimelineManager : MonoBehaviour
             isTimerRunning = true;
             stage2TremorDuration = 5f;
 
+            CleanupDeskCoverState();
             if (roomCamera != null)
             {
                 roomCamera.StopEarthquake();
@@ -1296,6 +1550,7 @@ public class GameTimelineManager : MonoBehaviour
         RebindSceneReferences();
         EnsureTimerTextReference();
         SetHUDVisibility(true);
+        CleanupDeskCoverState();
 
         if (playerMovement == null) playerMovement = FindFirstObjectByType<PlayerMovement>();
         if (playerMovement != null)
@@ -1345,7 +1600,7 @@ public class GameTimelineManager : MonoBehaviour
         {
             if (isGasShutOff)
             {
-                TriggerRewind("BUILDING COLLAPSE: You lingered inside the damaged apartment after the earthquake! Buildings can collapse at any moment from structural weakening and aftershocks. Once utilities are secured, evacuate immediately!");
+                TriggerRewind("TIME RAN OUT: Lingered too long in an apartment!");
             }
             else
             {

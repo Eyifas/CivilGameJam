@@ -778,6 +778,12 @@ public class SwitchInteraction : MonoBehaviour
         {
             AudioManager.PlayGasSuffocation();
         }
+        else if (reason.IndexOf("building", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                 reason.IndexOf("collapse", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                 reason.IndexOf("apartment!", StringComparison.OrdinalIgnoreCase) >= 0)
+        {
+            AudioManager.PlayWardrobeCrash();
+        }
         else
         {
             AudioManager.PlayExplosion();

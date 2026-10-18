@@ -345,6 +345,8 @@ public class PlayerMovement : MonoBehaviour
 
     private void Update()
     {
+        if (isCharacterHidden) return;
+
         // Hareket
         Vector3 direction = new Vector3(movement.x, movement.y, 0f);
         transform.position += direction * speed * Time.deltaTime;
@@ -475,7 +477,7 @@ public class PlayerMovement : MonoBehaviour
     {
         if (characterLight == null) return;
 
-        if (SwitchInteraction.IsAnyHazardActive)
+        if (isCharacterHidden || SwitchInteraction.IsAnyHazardActive)
         {
             if (characterLight.enabled) characterLight.enabled = false;
             return;
@@ -491,6 +493,8 @@ public class PlayerMovement : MonoBehaviour
 
     private void UpdateFlashlightState()
     {
+        if (isCharacterHidden) return;
+
         bool hasFlashlight = InventoryManager.HasItem("Flashlight") || InventoryManager.HasItem("fener");
         if (!hasFlashlight && GameTimelineManager.Instance != null)
         {
@@ -534,6 +538,48 @@ public class PlayerMovement : MonoBehaviour
         {
             prevFlashlightState = shouldFlashlightBeOn;
             AudioManager.PlayFlashlightToggle(shouldFlashlightBeOn);
+        }
+    }
+
+    private bool isCharacterHidden = false;
+    public bool IsCharacterHidden => isCharacterHidden;
+
+    public void SetCharacterHidden(bool hidden)
+    {
+        isCharacterHidden = hidden;
+
+        if (spriteRenderer == null)
+        {
+            spriteRenderer = GetComponentInChildren<SpriteRenderer>();
+        }
+
+        if (spriteRenderer != null)
+        {
+            spriteRenderer.enabled = !hidden;
+        }
+
+        if (flashlightVisual != null)
+        {
+            flashlightVisual.gameObject.SetActive(!hidden && IsFlashlightEquipped && !SwitchInteraction.IsAnyHazardActive);
+        }
+
+        if (hidden)
+        {
+            if (characterLight != null) characterLight.enabled = false;
+        }
+        else
+        {
+            UpdateCharacterLight();
+        }
+    }
+
+    public void Teleport(Vector3 newPosition)
+    {
+        transform.position = newPosition;
+        var rb = GetComponent<Rigidbody2D>();
+        if (rb != null)
+        {
+            rb.linearVelocity = Vector2.zero;
         }
     }
 }
