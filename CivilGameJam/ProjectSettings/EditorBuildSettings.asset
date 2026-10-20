@@ -6,7 +6,34 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
+    path: Assets/Scenes/StartScene.unity
+    guid: 627384b2c6fb2458183080f06665a4aa
+  - enabled: 1
     path: Assets/Scenes/MainScene.unity
     guid: 8c9cfa26abfee488c85f1582747f6a02
+  - enabled: 1
+    path: Assets/Scenes/DrawerScene.unity
+    guid: 6cc84de507f00464fb4b23c8b4f4706a
+  - enabled: 1
+    path: Assets/Scenes/BookshelfScene.unity
+    guid: 82be2aff66c5b42968c838123db76ca9
+  - enabled: 1
+    path: Assets/Scenes/TableScene.unity
+    guid: a1beefa4c4ab4cc0bb6d1983b4ccd4b8
+  - enabled: 1
+    path: Assets/Scenes/CupboardScene.unity
+    guid: c823f561733544343ab3bc8407a3541f
+  - enabled: 1
+    path: Assets/Scenes/PipeScene.unity
+    guid: 662c2e59f3d9c49f0ba92e3ef2d5207f
+  - enabled: 1
+    path: Assets/Scenes/DolapScene.unity
+    guid: 721bbba50e6824c96b43164e2392375f
+  - enabled: 1
+    path: Assets/Scenes/DoorScene.unity
+    guid: 4a8e97c12f0148bd86519da37e2cb044
+  - enabled: 1
+    path: Assets/Scenes/EndScene.unity
+    guid: 939d6d0969bd04926ad104cd20663735
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 2bcd2660ca9b64942af0de543d8d7100, type: 3}

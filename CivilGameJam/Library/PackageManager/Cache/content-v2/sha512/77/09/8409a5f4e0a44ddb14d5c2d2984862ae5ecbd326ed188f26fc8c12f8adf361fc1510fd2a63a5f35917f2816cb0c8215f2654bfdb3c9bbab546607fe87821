@@ -1,1 +1,0 @@
-{"status":"Valid","reason":"Signature is ok","isLegacy":false,"attestation":{"version":1,"format":"archive","integrity":"sha256-txBrpXwHuwbh9hyAPHiLZ5anBPipHpwsBkLOHyh0Eos=","packageName":"com.unity.collab-proxy","packageVersion":"2.13.6","publishingChannel":"unity","entitlementKeys":[],"artifactType":"upmPackage"}}
