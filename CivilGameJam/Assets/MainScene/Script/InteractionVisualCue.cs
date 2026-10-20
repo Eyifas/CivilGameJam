@@ -43,6 +43,7 @@ public class InteractionVisualCue : MonoBehaviour
     private Vector2 baseArrowAnchoredPos = Vector2.zero;
     private bool isDismissing = false;
     private float dismissTimer = 0f;
+    private string sourceSceneName = null;
 
     // Cached Procedural Sprites
     private static Sprite s_clockwiseArrow;
@@ -129,15 +130,38 @@ public class InteractionVisualCue : MonoBehaviour
     private static InteractionVisualCue InstantiateCue(Transform parentCanvas)
     {
         Transform canvasTransform = parentCanvas;
-        if (canvasTransform == null)
+        UnityEngine.SceneManagement.Scene activeScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
+
+        // Never parent to PersistentCanvas / DontDestroyOnLoad canvas!
+        // Doing so causes local minigame cues to leak across scenes into MainScene and beyond.
+        bool isPersistentCanvas = canvasTransform != null && canvasTransform.gameObject.scene.name == "DontDestroyOnLoad";
+
+        if (canvasTransform == null || isPersistentCanvas)
         {
-            var canvas = FindFirstObjectByType<Canvas>();
-            if (canvas != null) canvasTransform = canvas.transform;
+            // Check for a non-persistent Canvas belonging to the current active scene
+            Canvas localCanvas = null;
+            var allCanvases = FindObjectsByType<Canvas>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            foreach (var c in allCanvases)
+            {
+                if (c.gameObject.scene == activeScene && c.gameObject.scene.name != "DontDestroyOnLoad")
+                {
+                    localCanvas = c;
+                    break;
+                }
+            }
+
+            if (localCanvas != null)
+            {
+                canvasTransform = localCanvas.transform;
+            }
             else
             {
+                // Create a dedicated local Canvas belonging strictly to activeScene
                 var newCanvasObj = new GameObject("InteractionCue_Canvas");
+                UnityEngine.SceneManagement.SceneManager.MoveGameObjectToScene(newCanvasObj, activeScene);
                 var c = newCanvasObj.AddComponent<Canvas>();
                 c.renderMode = RenderMode.ScreenSpaceOverlay;
+                c.sortingOrder = 45;
                 var cs = newCanvasObj.AddComponent<CanvasScaler>();
                 cs.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
                 cs.referenceResolution = new Vector2(1920, 1080);
@@ -157,7 +181,36 @@ public class InteractionVisualCue : MonoBehaviour
 
     private void Awake()
     {
+        sourceSceneName = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
         BuildUIHierarchy();
+    }
+
+    private void OnEnable()
+    {
+        UnityEngine.SceneManagement.SceneManager.sceneUnloaded += HandleSceneUnloaded;
+        UnityEngine.SceneManagement.SceneManager.activeSceneChanged += HandleActiveSceneChanged;
+    }
+
+    private void OnDisable()
+    {
+        UnityEngine.SceneManagement.SceneManager.sceneUnloaded -= HandleSceneUnloaded;
+        UnityEngine.SceneManagement.SceneManager.activeSceneChanged -= HandleActiveSceneChanged;
+    }
+
+    private void HandleSceneUnloaded(UnityEngine.SceneManagement.Scene scene)
+    {
+        if (!string.IsNullOrEmpty(sourceSceneName) && scene.name == sourceSceneName)
+        {
+            Destroy(gameObject);
+        }
+    }
+
+    private void HandleActiveSceneChanged(UnityEngine.SceneManagement.Scene current, UnityEngine.SceneManagement.Scene next)
+    {
+        if (!string.IsNullOrEmpty(sourceSceneName) && next.name != sourceSceneName)
+        {
+            Destroy(gameObject);
+        }
     }
 
     private void BuildUIHierarchy()
@@ -308,6 +361,13 @@ public class InteractionVisualCue : MonoBehaviour
 
     private void Update()
     {
+        // Fail-safe: if the active scene has changed since creation, destroy immediately
+        if (!string.IsNullOrEmpty(sourceSceneName) && UnityEngine.SceneManagement.SceneManager.GetActiveScene().name != sourceSceneName)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
         if (isDismissing)
         {
             dismissTimer += Time.deltaTime;

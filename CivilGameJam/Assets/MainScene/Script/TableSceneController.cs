@@ -54,6 +54,12 @@ public class TableSceneController : MonoBehaviour
     private string currentInstruction = "";
     private Coroutine loweringCoroutine = null;
 
+    // Visual Guidance Cues
+    private InteractionVisualCue candleCue;
+    private InteractionVisualCue paintingCue;
+    private InteractionVisualCue returnCue;
+    private Coroutine autoReturnCoroutine = null;
+
     private void Awake()
     {
         Instance = this;
@@ -159,11 +165,70 @@ public class TableSceneController : MonoBehaviour
         // 4. Both already done?
         if (candleExtinguished && paintingSafe)
         {
-            UpdateInstruction("<color=green>Table and painting already secured! Returning to room...</color>");
-            isTransitioningBack = true;
-            StartCoroutine(ReturnToRoomRoutine());
+            UpdateInstruction("<color=green>Table and painting already secured! Press [E] or click Go Back to return.</color>");
+            SpawnReturnCue(true);
+            autoReturnCoroutine = StartCoroutine(ReturnToRoomRoutine(3.0f));
             return;
         }
+
+        UpdateInstruction("Click the candle to extinguish flame | Hold & release in GREEN to lower painting!");
+
+        // 5. Spawn Visual Guidance Cues
+        if (!candleExtinguished)
+        {
+            Vector3 candlePos = candleFlame != null ? candleFlame.transform.position : new Vector3(-2.8f, -0.6f, 0f);
+            candleCue = InteractionVisualCue.CreateClickCue(
+                null,
+                candlePos,
+                "CLICK",
+                "Extinguish flame",
+                true,
+                new Vector2(0f, 85f),
+                Camera.main
+            );
+        }
+
+        if (!paintingSafe)
+        {
+            Vector3 paintPos = paintingTransform != null ? paintingTransform.position : new Vector3(-0.06f, 3.15f, 0f);
+            paintingCue = InteractionVisualCue.CreateClickCue(
+                null,
+                paintPos,
+                "HOLD & RELEASE",
+                "Lower safely to floor",
+                true,
+                new Vector2(0f, -85f),
+                Camera.main
+            );
+        }
+
+        // 6. Spawn Return to Room Cue (Stage 1 guidance)
+        SpawnReturnCue(false);
+    }
+
+    private void SpawnReturnCue(bool highlighted)
+    {
+        if (returnCue != null)
+        {
+            returnCue.Dismiss();
+            returnCue = null;
+        }
+
+        Camera cam = Camera.main != null ? Camera.main : FindFirstObjectByType<Camera>();
+        Vector3 cuePos = cam != null ? cam.ViewportToWorldPoint(new Vector3(0.18f, 0.88f, 10f)) : new Vector3(-5.5f, 3.8f, 0f);
+
+        string mainText = "PRESS [E]";
+        string subText = highlighted ? "Tasks Done! Return to Room" : "Return to Main Room";
+
+        returnCue = InteractionVisualCue.CreateClickCue(
+            null,
+            cuePos,
+            mainText,
+            subText,
+            false, // Point up toward top-left return button
+            new Vector2(0f, -40f),
+            cam
+        );
     }
 
     private void SetTableVisuals(bool extinguished)
@@ -216,6 +281,12 @@ public class TableSceneController : MonoBehaviour
         if (candleExtinguished) return;
 
         candleExtinguished = true;
+
+        if (candleCue != null)
+        {
+            candleCue.Dismiss();
+            candleCue = null;
+        }
 
         AudioManager.PlayCandlePuff();
         SetTableVisuals(true);
@@ -325,6 +396,12 @@ public class TableSceneController : MonoBehaviour
             paintingSafe = true;
             currentCharge = 0f;
 
+            if (paintingCue != null)
+            {
+                paintingCue.Dismiss();
+                paintingCue = null;
+            }
+
             if (GameTimelineManager.Instance != null)
             {
                 GameTimelineManager.Instance.SetPaintingRemoved(true);
@@ -405,19 +482,43 @@ public class TableSceneController : MonoBehaviour
 
     private void CheckBothCompleted()
     {
+        if (candleCue != null) { candleCue.Dismiss(); candleCue = null; }
+        if (paintingCue != null) { paintingCue.Dismiss(); paintingCue = null; }
+
         if (candleExtinguished && paintingSafe)
         {
-            isTransitioningBack = true;
             AudioManager.PlayAnchorSuccess();
-            UpdateInstruction("<color=green>All secured! Table flame extinguished and painting safe. Returning...</color>");
-            StartCoroutine(ReturnToRoomRoutine());
+            UpdateInstruction("<color=green>All secured! Table flame extinguished and painting safe. Press [E] to return.</color>");
+
+            SpawnReturnCue(true);
+
+            if (autoReturnCoroutine != null) StopCoroutine(autoReturnCoroutine);
+            autoReturnCoroutine = StartCoroutine(ReturnToRoomRoutine(4.0f));
         }
     }
 
-    private IEnumerator ReturnToRoomRoutine()
+    private IEnumerator ReturnToRoomRoutine(float delay = 1.2f)
     {
-        yield return new WaitForSeconds(autoReturnDelay);
-        SceneManager.LoadScene(returnSceneName);
+        yield return new WaitForSeconds(delay);
+        TriggerReturn();
+    }
+
+    public void TriggerReturn()
+    {
+        if (isTransitioningBack) return;
+        isTransitioningBack = true;
+
+        CleanupCues();
+
+        var rtr = FindFirstObjectByType<ReturnToRoom>();
+        if (rtr != null)
+        {
+            rtr.ReturnToMain();
+        }
+        else
+        {
+            SceneManager.LoadScene(returnSceneName);
+        }
     }
 
     private void UpdateInstruction(string message)
@@ -432,7 +533,24 @@ public class TableSceneController : MonoBehaviour
 
     private void OnGUI()
     {
-        // Draw Hold & Release Gauge while holding
+        // 1. Draw top instruction banner if no TextMeshPro is bound in scene
+        if (instructionText == null && !string.IsNullOrEmpty(currentInstruction))
+        {
+            GUIStyle bannerStyle = new GUIStyle(GUI.skin.box);
+            bannerStyle.fontSize = 18;
+            bannerStyle.alignment = TextAnchor.MiddleCenter;
+            bannerStyle.normal.textColor = Color.white;
+            bannerStyle.richText = true;
+
+            float w = Mathf.Min(Screen.width * 0.85f, 750f);
+            float h = 42f;
+            float x = (Screen.width - w) * 0.5f;
+            float y = 20f;
+
+            GUI.Box(new Rect(x, y, w, h), currentInstruction, bannerStyle);
+        }
+
+        // 2. Draw Hold & Release Gauge while holding
         if (isHolding && !paintingSafe)
         {
             DrawHoldGauge();
@@ -474,11 +592,36 @@ public class TableSceneController : MonoBehaviour
         GUI.color = Color.white;
     }
 
+    private void OnDisable()
+    {
+        CleanupCues();
+    }
+
     private void OnDestroy()
     {
         if (Instance == this)
         {
             Instance = null;
+        }
+        CleanupCues();
+    }
+
+    private void CleanupCues()
+    {
+        if (candleCue != null)
+        {
+            if (candleCue.gameObject != null) Destroy(candleCue.gameObject);
+            candleCue = null;
+        }
+        if (paintingCue != null)
+        {
+            if (paintingCue.gameObject != null) Destroy(paintingCue.gameObject);
+            paintingCue = null;
+        }
+        if (returnCue != null)
+        {
+            if (returnCue.gameObject != null) Destroy(returnCue.gameObject);
+            returnCue = null;
         }
     }
 }

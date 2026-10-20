@@ -56,11 +56,39 @@ public class InventoryUI : MonoBehaviour
 
     private void Update()
     {
+        string sceneName = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+        if (sceneName == "EndScene" || sceneName == "StartScene")
+        {
+            if (panelImage != null) panelImage.gameObject.SetActive(false);
+            if (itemIcons != null)
+            {
+                for (int i = 0; i < itemIcons.Length; i++)
+                {
+                    if (itemIcons[i] != null) itemIcons[i].gameObject.SetActive(false);
+                }
+            }
+            return;
+        }
+
         UpdateInventoryUI();
     }
 
     public void UpdateInventoryUI()
     {
+        string sceneName = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+        if (sceneName == "EndScene" || sceneName == "StartScene")
+        {
+            if (panelImage != null) panelImage.gameObject.SetActive(false);
+            if (itemIcons != null)
+            {
+                for (int i = 0; i < itemIcons.Length; i++)
+                {
+                    if (itemIcons[i] != null) itemIcons[i].gameObject.SetActive(false);
+                }
+            }
+            return;
+        }
+
         List<string> items = InventoryManager.GetItems();
 
         if (itemIcons == null) return;

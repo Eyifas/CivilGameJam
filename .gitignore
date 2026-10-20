@@ -113,3 +113,6 @@ Windows Build
 
 # Library files
 Library
+
+# VSCode settings
+.vscode/

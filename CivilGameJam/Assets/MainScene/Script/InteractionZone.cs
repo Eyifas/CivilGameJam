@@ -173,6 +173,9 @@ public class InteractionZone : MonoBehaviour
         if (IsDolapZone() && GameTimelineManager.Instance.IsDolapSecured)
             return true;
 
+        if (IsDrawerZone() && TodoListUI.HasAllDrawerItems())
+            return true;
+
         return false;
     }
 
@@ -190,6 +193,25 @@ public class InteractionZone : MonoBehaviour
 
         if (name.IndexOf("düşme", System.StringComparison.OrdinalIgnoreCase) >= 0 ||
             name.IndexOf("dsme", System.StringComparison.OrdinalIgnoreCase) >= 0)
+            return true;
+
+        return false;
+    }
+
+    public bool IsDrawerZone()
+    {
+        if (!string.IsNullOrEmpty(sceneName) && sceneName.IndexOf("Drawer", System.StringComparison.OrdinalIgnoreCase) >= 0)
+            return true;
+
+        if (transform.parent != null && 
+            (transform.parent.name.IndexOf("Drawer", System.StringComparison.OrdinalIgnoreCase) >= 0 ||
+             transform.parent.name.IndexOf("Cekmece", System.StringComparison.OrdinalIgnoreCase) >= 0 ||
+             transform.parent.name.IndexOf("Çekmece", System.StringComparison.OrdinalIgnoreCase) >= 0))
+            return true;
+
+        if (name.IndexOf("Drawer", System.StringComparison.OrdinalIgnoreCase) >= 0 ||
+            name.IndexOf("Cekmece", System.StringComparison.OrdinalIgnoreCase) >= 0 ||
+            name.IndexOf("Çekmece", System.StringComparison.OrdinalIgnoreCase) >= 0)
             return true;
 
         return false;
@@ -382,7 +404,13 @@ public class InteractionZone : MonoBehaviour
             return stage == GameStage.Stage3_Utilities && !GameTimelineManager.Instance.IsDolapSecured;
         }
 
-        // Room preparation zones (Drawer, Bookshelf, Table/Painting) are only interactable during Stage 1 Preparation
+        if (IsDrawerZone())
+        {
+            // Drawer can be searched in Stage 1 Preparation AND Stage 3 Utilities (until all drawer items are collected)
+            return (stage == GameStage.Stage1_Preparation || stage == GameStage.Stage3_Utilities) && !TodoListUI.HasAllDrawerItems();
+        }
+
+        // Room preparation zones (Bookshelf, Table/Painting) are only interactable during Stage 1 Preparation
         return stage == GameStage.Stage1_Preparation && !IsZoneCompleted();
     }
 

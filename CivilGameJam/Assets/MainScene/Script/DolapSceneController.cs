@@ -115,6 +115,19 @@ public class DolapSceneController : MonoBehaviour
         BuildQTEOverlayUI();
     }
 
+    private void OnDestroy()
+    {
+        if (Instance == this)
+        {
+            Instance = null;
+        }
+        if (liftCue != null)
+        {
+            if (liftCue.gameObject != null) Destroy(liftCue.gameObject);
+            liftCue = null;
+        }
+    }
+
     private void Start()
     {
         UpdateDolapVisuals();
@@ -150,6 +163,16 @@ public class DolapSceneController : MonoBehaviour
     private static Sprite LoadSpriteByName(string baseName)
     {
         Sprite s = Resources.Load<Sprite>(baseName);
+        if (s != null) return s;
+
+        s = Resources.Load<Sprite>("Dolap/" + baseName);
+        if (s != null) return s;
+
+        // Also check dusme_dolap (ASCII name)
+        string asciiName = NormalizeName(baseName).Replace(" ", "_");
+        s = Resources.Load<Sprite>("Dolap/" + asciiName);
+        if (s != null) return s;
+        s = Resources.Load<Sprite>(asciiName);
         if (s != null) return s;
 
 #if UNITY_EDITOR

@@ -130,6 +130,10 @@ public class SwitchInteraction : MonoBehaviour
     {
         EnsureSwitchImageReference();
         ApplySortingOrder(switchImage);
+        if (switchImage != null)
+        {
+            switchImage.SetActive(false);
+        }
     }
 
     private void Start()
@@ -460,6 +464,14 @@ public class SwitchInteraction : MonoBehaviour
 
     private void RestoreGameUI()
     {
+        string sceneName = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+        if (sceneName == "EndScene" || sceneName == "StartScene")
+        {
+            disabledCanvases.Clear();
+            disabledObjects.Clear();
+            return;
+        }
+
         if (GameTimelineManager.Instance != null)
         {
             GameTimelineManager.Instance.SetHUDVisibility(true);
@@ -548,6 +560,7 @@ public class SwitchInteraction : MonoBehaviour
             if (safeRoomLightObj == null)
             {
                 safeRoomLightObj = new GameObject("KitchenSafeRoomLight");
+                safeRoomLightObj.SetActive(false); // Prevents OnEnable from temporarily registering as default Global light in URP
                 safeRoomLightObj.transform.position = transform.position + new Vector3(0f, 1f, 0f);
                 var light2D = safeRoomLightObj.AddComponent<UnityEngine.Rendering.Universal.Light2D>();
                 light2D.lightType = UnityEngine.Rendering.Universal.Light2D.LightType.Point;
@@ -555,6 +568,7 @@ public class SwitchInteraction : MonoBehaviour
                 light2D.intensity = 1.4f;
                 light2D.pointLightOuterRadius = 6.5f;
                 light2D.pointLightInnerRadius = 1.2f;
+                safeRoomLightObj.SetActive(isSafeLightOn);
             }
             if (safeRoomLightObj != null) safeRoomLightObj.SetActive(isSafeLightOn);
             SetPromptLabel(isSafeLightOn ? "Turn Off Light" : "Turn On Light");
@@ -567,7 +581,16 @@ public class SwitchInteraction : MonoBehaviour
         var allSwitches = FindObjectsByType<SwitchInteraction>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         foreach (var s in allSwitches)
         {
-            if (s != null) s.triggered = false;
+            if (s != null)
+            {
+                s.triggered = false;
+                s.HideVisual();
+                if (s.transform.parent != null && s.transform.parent.name == "HazardVisuals")
+                {
+                    s.gameObject.SetActive(true);
+                    s.enabled = true;
+                }
+            }
         }
     }
 
@@ -576,6 +599,11 @@ public class SwitchInteraction : MonoBehaviour
         if (switchImage != null)
         {
             switchImage.SetActive(false);
+            var backdrop = switchImage.transform.Find("Backdrop");
+            if (backdrop != null)
+            {
+                backdrop.gameObject.SetActive(false);
+            }
         }
         triggered = false;
         IsAnyHazardActive = false;
@@ -587,6 +615,15 @@ public class SwitchInteraction : MonoBehaviour
     public void TriggerSequence()
     {
         if (triggered) return;
+        if (!gameObject.activeInHierarchy)
+        {
+            if (transform.parent != null && !transform.parent.gameObject.activeInHierarchy)
+            {
+                transform.parent.gameObject.SetActive(true);
+            }
+            gameObject.SetActive(true);
+        }
+        if (!enabled) enabled = true;
         StartCoroutine(SwitchDeathSequence(educationalReason, rewindDuration, imageDuration));
     }
 
@@ -596,6 +633,15 @@ public class SwitchInteraction : MonoBehaviour
     public void TriggerSequence(string customReason, float customRewindDuration, float customImageDuration = 2.2f, Action onDone = null)
     {
         if (triggered) return;
+        if (!gameObject.activeInHierarchy)
+        {
+            if (transform.parent != null && !transform.parent.gameObject.activeInHierarchy)
+            {
+                transform.parent.gameObject.SetActive(true);
+            }
+            gameObject.SetActive(true);
+        }
+        if (!enabled) enabled = true;
         StartCoroutine(SwitchDeathSequence(customReason, customRewindDuration, customImageDuration, onDone));
     }
 

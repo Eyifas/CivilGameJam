@@ -142,6 +142,19 @@ public class PipeSceneController : MonoBehaviour
         BuildProceduralUI();
     }
 
+    private void OnDestroy()
+    {
+        if (Instance == this)
+        {
+            Instance = null;
+        }
+        if (turnValveCue != null)
+        {
+            if (turnValveCue.gameObject != null) Destroy(turnValveCue.gameObject);
+            turnValveCue = null;
+        }
+    }
+
     private void Start()
     {
         // Check if gas was already shut off previously

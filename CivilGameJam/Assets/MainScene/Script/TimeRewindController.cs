@@ -720,7 +720,7 @@ public class TimeRewindController : MonoBehaviour
         }
 
         // 11. Building Collapse (After-effect / stayed in apartment)
-        if (lower.Contains("building collapse") || lower.Contains("structural") || lower.Contains("damaged apartment") || lower.Contains("collapsed") || lower.Contains("lingered inside"))
+        if (lower.Contains("building collapse") || lower.Contains("structural") || lower.Contains("damaged apartment") || lower.Contains("collapsed") || lower.Contains("lingered inside") || lower.Contains("lingered too long") || lower.Contains("lingered"))
         {
             return new FormattedRewindReason
             {
@@ -1269,6 +1269,12 @@ public class TimeRewindController : MonoBehaviour
         }
 
         isRewinding = false;
+
+        var lightCtrl = EarthquakeLightController.Instance ?? FindFirstObjectByType<EarthquakeLightController>();
+        if (lightCtrl != null)
+        {
+            lightCtrl.ApplyNormalLighting();
+        }
         onComplete?.Invoke();
     }
 
@@ -1483,6 +1489,12 @@ public class TimeRewindController : MonoBehaviour
 
         isRewinding = false;
 
+        var lightCtrl = EarthquakeLightController.Instance ?? FindFirstObjectByType<EarthquakeLightController>();
+        if (lightCtrl != null)
+        {
+            lightCtrl.ApplyNormalLighting();
+        }
+
         // -------------------------------------------------------------
         // PHASE 5: Start Game!
         // -------------------------------------------------------------
@@ -1615,7 +1627,15 @@ public class TimeRewindController : MonoBehaviour
             Debug.LogError($"[TimeRewind] Error during Game Over restart: {ex}");
         }
 
+        // Keep eyes completely shut while the fresh scene loads and rebinds references
+        while (GameTimelineManager.Instance != null && GameTimelineManager.Instance.IsRestartingMainScene)
+        {
+            SetEyeOpenAmount(0f);
+            yield return null;
+        }
+
         yield return null;
+        SetEyeOpenAmount(0f);
 
         // PHASE 4: Eye opens to fresh game run
         elapsed = 0f;
@@ -1631,6 +1651,20 @@ public class TimeRewindController : MonoBehaviour
 
         if (eyelidsRoot != null) eyelidsRoot.SetActive(false);
         isRewinding = false;
+    }
+
+    public void ResetOverlayState()
+    {
+        isRewinding = false;
+        if (clockRoot != null) clockRoot.SetActive(false);
+        if (eyelidsRoot != null) eyelidsRoot.SetActive(false);
+        SetEyeOpenImmediate(1f);
+
+        var lightCtrl = EarthquakeLightController.Instance ?? FindFirstObjectByType<EarthquakeLightController>();
+        if (lightCtrl != null)
+        {
+            lightCtrl.ApplyNormalLighting();
+        }
     }
 
     /// <summary>

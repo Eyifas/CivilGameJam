@@ -14,16 +14,25 @@ public class EarthquakeLightController : MonoBehaviour
     private float flickerTimer;
     private bool isCustomControlled = false;
 
-    public float NormalIntensity => normalIntensity;
+    public float NormalIntensity => normalIntensity > 0f ? normalIntensity : 1f;
     public Light2D GlobalLight => globalLight;
 
     private void Awake()
     {
         Instance = this;
-        if (globalLight == null)
-        {
-            globalLight = GetComponent<Light2D>();
-        }
+        isCustomControlled = false;
+        EnsureGlobalLight();
+        ApplyNormalLighting();
+    }
+
+    private void Start()
+    {
+        ApplyNormalLighting();
+    }
+
+    private void OnEnable()
+    {
+        ApplyNormalLighting();
     }
 
     private void OnDestroy()
@@ -34,6 +43,37 @@ public class EarthquakeLightController : MonoBehaviour
         }
     }
 
+    public void EnsureGlobalLight()
+    {
+        if (globalLight == null)
+        {
+            globalLight = GetComponent<Light2D>();
+        }
+        if (globalLight == null)
+        {
+            var lights = FindObjectsByType<Light2D>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            foreach (var l in lights)
+            {
+                if (l != null && l.lightType == Light2D.LightType.Global)
+                {
+                    globalLight = l;
+                    break;
+                }
+            }
+        }
+    }
+
+    public void ApplyNormalLighting()
+    {
+        EnsureGlobalLight();
+        isCustomControlled = false;
+        if (globalLight != null)
+        {
+            globalLight.enabled = true;
+            globalLight.intensity = NormalIntensity;
+        }
+    }
+
     public void SetCustomControlled(bool custom)
     {
         isCustomControlled = custom;
@@ -41,8 +81,13 @@ public class EarthquakeLightController : MonoBehaviour
 
     public void SetLightIntensity(float intensity)
     {
+        EnsureGlobalLight();
         if (globalLight != null)
         {
+            if (intensity > 0f && !globalLight.enabled)
+            {
+                globalLight.enabled = true;
+            }
             globalLight.intensity = intensity;
         }
     }
@@ -54,17 +99,21 @@ public class EarthquakeLightController : MonoBehaviour
             return;
         }
 
-        if (GameTimelineManager.Instance == null || globalLight == null)
+        EnsureGlobalLight();
+        if (globalLight == null)
         {
             return;
         }
 
-        GameStage stage = GameTimelineManager.Instance.CurrentStage;
+        GameStage stage = GameTimelineManager.Instance != null
+            ? GameTimelineManager.Instance.CurrentStage
+            : GameStage.Stage1_Preparation;
 
-        // Hazırlık aşaması: ışık normal
-        if (stage == GameStage.Stage1_Preparation)
+        // Hazırlık aşaması veya geri sarma: ışık her zaman normal açık
+        if (stage == GameStage.Stage1_Preparation || stage == GameStage.Rewinding)
         {
-            globalLight.intensity = normalIntensity;
+            if (!globalLight.enabled) globalLight.enabled = true;
+            globalLight.intensity = NormalIntensity;
         }
 
         // Deprem sırasında: ışık gidip geliyor
@@ -79,8 +128,9 @@ public class EarthquakeLightController : MonoBehaviour
                 // Bazen tamamen sön, bazen normal yan
                 bool lightOn = Random.value > 0.45f;
 
+                if (!globalLight.enabled) globalLight.enabled = true;
                 globalLight.intensity = lightOn
-                    ? normalIntensity
+                    ? NormalIntensity
                     : 0f;
             }
         }
@@ -90,7 +140,8 @@ public class EarthquakeLightController : MonoBehaviour
         {
             if (GameTimelineManager.Instance != null && GameTimelineManager.Instance.IsElectricityRestored)
             {
-                globalLight.intensity = normalIntensity;
+                if (!globalLight.enabled) globalLight.enabled = true;
+                globalLight.intensity = NormalIntensity;
             }
             else
             {

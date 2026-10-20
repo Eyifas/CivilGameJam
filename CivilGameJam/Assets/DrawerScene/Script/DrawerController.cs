@@ -45,23 +45,46 @@ public class DrawerController : MonoBehaviour
         UpdateDrawerVisual();
     }
 
+    public bool IsLeftOpen => leftOpen;
+    public bool IsRightOpen => rightOpen;
+
     private void Start()
     {
         UpdateItems();
+        UpdateHitboxes();
         TodoListUI.RegisterDrawerChecked();
 
-        var canvas = FindFirstObjectByType<Canvas>();
-        if (canvas != null)
+        // Allow InteractionVisualCue to create or attach to a local active-scene canvas
+        drawerCue = InteractionVisualCue.CreateClickCue(
+            null,
+            transform.position + new Vector3(0f, 1.2f, 0f),
+            "CLICK DRAWERS",
+            "Open & search drawers",
+            true,
+            new Vector2(0f, 110f),
+            Camera.main
+        );
+    }
+
+    private void OnDisable()
+    {
+        CleanupCue();
+    }
+
+    private void OnDestroy()
+    {
+        CleanupCue();
+    }
+
+    private void CleanupCue()
+    {
+        if (drawerCue != null)
         {
-            drawerCue = InteractionVisualCue.CreateClickCue(
-                canvas.transform,
-                transform.position + new Vector3(0f, 1.2f, 0f),
-                "CLICK DRAWERS",
-                "Open & search drawers",
-                true,
-                new Vector2(0f, 110f),
-                Camera.main
-            );
+            if (drawerCue.gameObject != null)
+            {
+                Destroy(drawerCue.gameObject);
+            }
+            drawerCue = null;
         }
     }
 
@@ -72,6 +95,7 @@ public class DrawerController : MonoBehaviour
 
         UpdateDrawerVisual();
         UpdateItems();
+        UpdateHitboxes();
         TodoListUI.RegisterDrawerChecked();
     }
 
@@ -82,7 +106,17 @@ public class DrawerController : MonoBehaviour
 
         UpdateDrawerVisual();
         UpdateItems();
+        UpdateHitboxes();
         TodoListUI.RegisterDrawerChecked();
+    }
+
+    public void UpdateHitboxes()
+    {
+        var clickAreas = GetComponentsInChildren<DrawerClickArea>(true);
+        foreach (var ca in clickAreas)
+        {
+            ca.UpdateHitboxState();
+        }
     }
 
     private void UpdateDrawerVisual()

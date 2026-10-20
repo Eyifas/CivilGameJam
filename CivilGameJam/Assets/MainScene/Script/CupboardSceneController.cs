@@ -139,6 +139,11 @@ public class CupboardSceneController : MonoBehaviour
         {
             Instance = null;
         }
+        if (pushCue != null)
+        {
+            if (pushCue.gameObject != null) Destroy(pushCue.gameObject);
+            pushCue = null;
+        }
     }
 
     private void FindSceneObjects()

@@ -45,18 +45,30 @@ public class PersistentCanvas : MonoBehaviour
     private void HandleSceneLoaded(Scene scene, LoadSceneMode mode)
     {
         // EndScene'de Main Canvas'ı gizle
-        if (scene.name == "EndScene")
+        if (scene.name == "EndScene" || scene.name == "StartScene")
         {
             SetCanvasVisible(false);
+            gameObject.SetActive(false);
             CleanupDuplicateEventSystems();
             return;
         }
 
+        gameObject.SetActive(true);
         // Diğer sahnelerde tekrar göster
         SetCanvasVisible(true);
 
         CleanupDuplicateEventSystems();
         TodoListUI.EnsureTodoListUI();
+
+        // Purge any lingering visual cues parented to PersistentCanvas so they never bleed into other scenes
+        var lingeringCues = GetComponentsInChildren<InteractionVisualCue>(true);
+        foreach (var cue in lingeringCues)
+        {
+            if (cue != null && cue.gameObject != null)
+            {
+                Destroy(cue.gameObject);
+            }
+        }
     }
 
     private void SetCanvasVisible(bool visible)
@@ -66,6 +78,12 @@ public class PersistentCanvas : MonoBehaviour
         foreach (Canvas canvas in canvases)
         {
             canvas.enabled = visible;
+        }
+
+        var graphics = GetComponentsInChildren<UnityEngine.UI.Graphic>(true);
+        foreach (var g in graphics)
+        {
+            g.enabled = visible;
         }
     }
 

@@ -432,13 +432,15 @@ public class HazardVisualManager : MonoBehaviour
     {
         if (string.IsNullOrEmpty(educationalReason)) return null;
 
+        SwitchInteraction found = null;
         foreach (var config in hazardConfigs)
         {
             if (educationalReason.IndexOf(config.title, StringComparison.OrdinalIgnoreCase) >= 0)
             {
                 if (activeHazardInteractions.TryGetValue(config.id, out var switchComp))
                 {
-                    return switchComp;
+                    found = switchComp;
+                    break;
                 }
             }
 
@@ -448,22 +450,44 @@ public class HazardVisualManager : MonoBehaviour
                 {
                     if (activeHazardInteractions.TryGetValue(config.id, out var switchComp))
                     {
-                        return switchComp;
+                        found = switchComp;
+                        break;
                     }
+                }
+            }
+            if (found != null) break;
+        }
+
+        // Fallback: Check if any active hazard matches directly
+        if (found == null)
+        {
+            foreach (var kvp in activeHazardInteractions)
+            {
+                if (kvp.Value != null && kvp.Value.EducationalReason.IndexOf(educationalReason, StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    found = kvp.Value;
+                    break;
                 }
             }
         }
 
-        // Fallback: Check if any active hazard matches directly
-        foreach (var kvp in activeHazardInteractions)
+        if (found != null)
         {
-            if (kvp.Value != null && kvp.Value.EducationalReason.IndexOf(educationalReason, StringComparison.OrdinalIgnoreCase) >= 0)
+            if (found.transform.parent != null && !found.transform.parent.gameObject.activeInHierarchy)
             {
-                return kvp.Value;
+                found.transform.parent.gameObject.SetActive(true);
+            }
+            if (!found.gameObject.activeInHierarchy)
+            {
+                found.gameObject.SetActive(true);
+            }
+            if (!found.enabled)
+            {
+                found.enabled = true;
             }
         }
 
-        return null;
+        return found;
     }
 
     /// <summary>
@@ -507,6 +531,27 @@ public class HazardVisualManager : MonoBehaviour
             if (kvp.Value != null)
             {
                 kvp.Value.HideVisual();
+            }
+        }
+
+        if (hazardRoot != null)
+        {
+            hazardRoot.gameObject.SetActive(true);
+            for (int i = 0; i < hazardRoot.childCount; i++)
+            {
+                var child = hazardRoot.GetChild(i);
+                if (child != null)
+                {
+                    // Keep hazard component host GameObject active so StartCoroutine is never blocked
+                    child.gameObject.SetActive(true);
+                    var visual = child.Find("Visual") ?? child.Find("TempVisual");
+                    if (visual != null)
+                    {
+                        visual.gameObject.SetActive(false);
+                        var bd = visual.Find("Backdrop");
+                        if (bd != null) bd.gameObject.SetActive(false);
+                    }
+                }
             }
         }
     }

@@ -112,6 +112,46 @@ public class TodoListUI : MonoBehaviour
 
     public static bool HasExploredRooms => s_hasExploredRooms;
     public static bool HasCheckedDrawers => s_hasCheckedDrawers;
+    public static bool IsLookAroundDone => s_hasExploredRooms && HasAllDrawerItems();
+
+    public static bool HasAllDrawerItems()
+    {
+        var timeline = GameTimelineManager.Instance;
+        bool isBookshelfAnchored = timeline != null && timeline.IsBookshelfAnchored;
+
+        // 1. Hammer: in inventory or consumed by anchoring bookshelf
+        bool hasHammer = isBookshelfAnchored || InventoryManager.HasItem("Hammer");
+
+        // 2. Nails / Screws: in inventory or consumed by anchoring bookshelf
+        bool hasVida = isBookshelfAnchored ||
+                       InventoryManager.HasItem("Vida") ||
+                       InventoryManager.HasItem("Screw") ||
+                       InventoryManager.HasItem("Nail") ||
+                       InventoryManager.HasItem("Nails");
+
+        // 3. Flashlight: in inventory or recorded in timeline
+        bool hasFlashlight = (timeline != null && timeline.HasFlashlight) ||
+                             InventoryManager.HasItem("Flashlight") ||
+                             InventoryManager.HasItem("fener");
+
+        // 4. Key: in inventory
+        bool hasKey = InventoryManager.HasItem("Anahtar") || InventoryManager.HasItem("Key");
+
+        return hasHammer && hasVida && hasFlashlight && hasKey;
+    }
+
+    public static bool IsStage1WorkComplete()
+    {
+        var timeline = GameTimelineManager.Instance;
+        if (timeline == null) return false;
+
+        bool isBookshelfDone = timeline.IsBookshelfAnchored;
+        bool isHazardsDone = timeline.IsCandleExtinguished && timeline.IsPaintingRemoved;
+        bool isLookAroundDone = IsLookAroundDone;
+        bool hasAllDrawers = HasAllDrawerItems();
+
+        return isBookshelfDone && isHazardsDone && isLookAroundDone && hasAllDrawers;
+    }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void OnSubsystemRegistration()
@@ -152,21 +192,7 @@ public class TodoListUI : MonoBehaviour
 
     public static bool CheckDrawersCondition()
     {
-        if (s_hasCheckedDrawers) return true;
-
-        // Drawer items exclusive to DrawerScene
-        if (InventoryManager.HasItem("Hammer") ||
-            InventoryManager.HasItem("Vida") ||
-            InventoryManager.HasItem("Screw") ||
-            InventoryManager.HasItem("Nail") ||
-            InventoryManager.HasItem("Nails") ||
-            InventoryManager.HasItem("Anahtar"))
-        {
-            s_hasCheckedDrawers = true;
-            return true;
-        }
-
-        return false;
+        return HasAllDrawerItems();
     }
 
     private void Awake()
@@ -321,6 +347,11 @@ public class TodoListUI : MonoBehaviour
 
         TrackPlayerExploration();
         RefreshTodoList();
+
+        if (GameTimelineManager.Instance != null && GameTimelineManager.Instance.CurrentStage == GameStage.Stage1_Preparation)
+        {
+            GameTimelineManager.Instance.CheckStage1EarlyCompletion();
+        }
     }
 
     private void TrackPlayerExploration()
@@ -451,8 +482,8 @@ public class TodoListUI : MonoBehaviour
             ? "<color=#145A32><b>[✓] <s>1. Anchor the bookshelf</s></b></color>"
             : "<color=#2C1A0E><b>[ ] 1. Anchor the bookshelf</b></color>";
 
-        // Task 2: Look around (requires exploring rooms & checking the drawers)
-        bool hasDrawers = CheckDrawersCondition();
+        // Task 2: Look around (requires exploring rooms & collecting all drawer items)
+        bool hasDrawers = HasAllDrawerItems();
         bool isLookAroundDone = s_hasExploredRooms && hasDrawers;
         string item2;
         if (isLookAroundDone)

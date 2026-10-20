@@ -27,6 +27,9 @@ public class MainSceneDolap : MonoBehaviour
     private InteractionZone interactionZone;
     private BoxCollider2D triggerCollider;
     private BoxCollider2D blockingCollider;
+    public const float ExpectedDolapX = 9.03f;
+    public const float ExpectedDolapY = -0.42f;
+
     private bool hasFallen = false;
     private Coroutine fallCoroutine;
 
@@ -38,6 +41,9 @@ public class MainSceneDolap : MonoBehaviour
             return;
         }
         Instance = this;
+
+        // Ensure dolap is positioned at exact expected hallway position (x = 9.03f)
+        transform.position = new Vector3(ExpectedDolapX, ExpectedDolapY, transform.position.z);
 
         spriteRenderer = GetComponent<SpriteRenderer>();
         if (spriteRenderer == null) spriteRenderer = GetComponentInChildren<SpriteRenderer>();
@@ -117,29 +123,58 @@ public class MainSceneDolap : MonoBehaviour
 
     private void LoadSprites()
     {
-        if (frame1Upright == null) frame1Upright = LoadSpriteByName("düşme dolap1");
-        if (frame2Tilt == null) frame2Tilt = LoadSpriteByName("düşme dolap2");
-        if (frame3Falling == null) frame3Falling = LoadSpriteByName("düşme dolap3");
-        if (frame4Fallen == null) frame4Fallen = LoadSpriteByName("düşme dolap4");
+        if (frame1Upright == null) frame1Upright = LoadDolapSprite(1);
+        if (frame2Tilt == null) frame2Tilt = LoadDolapSprite(2);
+        if (frame3Falling == null) frame3Falling = LoadDolapSprite(3);
+        if (frame4Fallen == null) frame4Fallen = LoadDolapSprite(4);
+
+        Debug.Log($"[MainSceneDolap] Sprites loaded: frame1={(frame1Upright != null)}, frame2={(frame2Tilt != null)}, frame3={(frame3Falling != null)}, frame4={(frame4Fallen != null)}");
     }
 
-    private static Sprite LoadSpriteByName(string baseName)
+    private Sprite LoadDolapSprite(int index)
     {
-        // 1. Try Resources
-        Sprite s = Resources.Load<Sprite>(baseName);
+        // 1. If looking for frame 1 and spriteRenderer already has the upright sprite, use it!
+        if (index == 1 && spriteRenderer != null && spriteRenderer.sprite != null)
+        {
+            return spriteRenderer.sprite;
+        }
+
+        // 2. Try loading from Resources/Dolap/dusme_dolap{index}
+        Sprite s = Resources.Load<Sprite>($"Dolap/dusme_dolap{index}");
         if (s != null) return s;
 
-        // 2. Try disk read from Assets/MainScene/Sprite
-        string folder = Path.Combine(Application.dataPath, "MainScene", "Sprite");
-        if (Directory.Exists(folder))
+        // 3. Try loading directly from Resources
+        s = Resources.Load<Sprite>($"dusme_dolap{index}");
+        if (s != null) return s;
+
+        // 4. Try FindObjectsOfTypeAll<Sprite> for any already loaded sprite matching dolap + index
+        var allSprites = Resources.FindObjectsOfTypeAll<Sprite>();
+        foreach (var sp in allSprites)
         {
-            var files = Directory.GetFiles(folder, "*.png");
+            if (sp == null) continue;
+            string name = sp.name;
+            if (name.IndexOf("dolap", StringComparison.OrdinalIgnoreCase) >= 0 &&
+                (name.EndsWith(index.ToString()) || name.IndexOf("dolap" + index, StringComparison.OrdinalIgnoreCase) >= 0 || name.IndexOf("dolap_" + index, StringComparison.OrdinalIgnoreCase) >= 0))
+            {
+                return sp;
+            }
+        }
+
+        // 5. Try disk read from Assets/Resources/Dolap or Assets/MainScene/Sprite
+        string[] searchDirs = new string[]
+        {
+            Path.Combine(Application.dataPath, "Resources", "Dolap"),
+            Path.Combine(Application.dataPath, "MainScene", "Sprite")
+        };
+
+        foreach (var dir in searchDirs)
+        {
+            if (!Directory.Exists(dir)) continue;
+            var files = Directory.GetFiles(dir, "*.png");
             foreach (var f in files)
             {
                 string fn = Path.GetFileNameWithoutExtension(f);
-                if (fn.IndexOf(baseName, StringComparison.OrdinalIgnoreCase) >= 0 ||
-                    baseName.IndexOf(fn, StringComparison.OrdinalIgnoreCase) >= 0 ||
-                    NormalizeName(fn) == NormalizeName(baseName))
+                if (fn.IndexOf("dolap", StringComparison.OrdinalIgnoreCase) >= 0 && fn.EndsWith(index.ToString()))
                 {
                     try
                     {
@@ -157,12 +192,8 @@ public class MainSceneDolap : MonoBehaviour
                 }
             }
         }
-        return null;
-    }
 
-    private static string NormalizeName(string str)
-    {
-        return str.Replace("ü", "u").Replace("ş", "s").Replace("ç", "c").Replace("ı", "i").ToLowerInvariant().Trim();
+        return null;
     }
 
     public void HandleStageChanged(GameStage newStage)
@@ -256,19 +287,51 @@ public class MainSceneDolap : MonoBehaviour
 
     private void SetVisualUpright()
     {
+        transform.position = new Vector3(ExpectedDolapX, ExpectedDolapY, transform.position.z);
+        transform.localRotation = Quaternion.identity;
+
         if (spriteRenderer != null)
         {
             if (frame1Upright != null) spriteRenderer.sprite = frame1Upright;
-            spriteRenderer.transform.localRotation = Quaternion.identity;
+            if (spriteRenderer.transform != transform)
+            {
+                spriteRenderer.transform.localPosition = Vector3.zero;
+                spriteRenderer.transform.localRotation = Quaternion.identity;
+            }
         }
     }
 
     private void SetVisualFallen()
     {
+        transform.position = new Vector3(ExpectedDolapX, ExpectedDolapY, transform.position.z);
+        transform.localRotation = Quaternion.identity;
+
         if (spriteRenderer != null)
         {
-            if (frame4Fallen != null) spriteRenderer.sprite = frame4Fallen;
-            else if (frame3Falling != null) spriteRenderer.sprite = frame3Falling;
+            if (frame4Fallen != null)
+            {
+                spriteRenderer.sprite = frame4Fallen;
+                if (spriteRenderer.transform != transform)
+                {
+                    spriteRenderer.transform.localPosition = Vector3.zero;
+                    spriteRenderer.transform.localRotation = Quaternion.identity;
+                }
+            }
+            else if (frame3Falling != null)
+            {
+                spriteRenderer.sprite = frame3Falling;
+                if (spriteRenderer.transform != transform)
+                {
+                    spriteRenderer.transform.localPosition = Vector3.zero;
+                    spriteRenderer.transform.localRotation = Quaternion.identity;
+                }
+            }
+            else
+            {
+                // Fallback: rotate wardrobe flat on floor
+                transform.localRotation = Quaternion.Euler(0f, 0f, -90f);
+                transform.position = new Vector3(ExpectedDolapX, -1.0f, transform.position.z);
+            }
         }
     }
 
@@ -313,7 +376,8 @@ public class MainSceneDolap : MonoBehaviour
 
         // 1. Shaking upright (düşme dolap1)
         SetVisualUpright();
-        Vector3 origPos = transform.position;
+        Vector3 origPos = new Vector3(ExpectedDolapX, ExpectedDolapY, transform.position.z);
+        transform.position = origPos;
         float elapsed = 0f;
         while (elapsed < 0.8f)
         {

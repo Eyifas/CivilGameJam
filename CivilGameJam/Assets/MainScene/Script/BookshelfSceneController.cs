@@ -100,6 +100,16 @@ public class BookshelfSceneController : MonoBehaviour
         {
             Instance = null;
         }
+        if (dragToolsCue != null)
+        {
+            if (dragToolsCue.gameObject != null) Destroy(dragToolsCue.gameObject);
+            dragToolsCue = null;
+        }
+        if (hammerTargetCue != null)
+        {
+            if (hammerTargetCue.gameObject != null) Destroy(hammerTargetCue.gameObject);
+            hammerTargetCue = null;
+        }
     }
 
     private void Start()

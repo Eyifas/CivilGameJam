@@ -197,7 +197,7 @@ public class PlayerMovement : MonoBehaviour
         }
     }
 
-    private void EnsureCharacterLight()
+    public void EnsureCharacterLight()
     {
         if (characterLight == null)
         {
@@ -212,10 +212,12 @@ public class PlayerMovement : MonoBehaviour
         if (characterLight == null)
         {
             GameObject charLightObj = new GameObject("CharacterLight");
+            charLightObj.SetActive(false); // Prevents OnEnable from temporarily registering as default Global light in URP
             charLightObj.transform.SetParent(transform, false);
             charLightObj.transform.localPosition = new Vector3(characterLightOffset.x, characterLightOffset.y, 0f);
             characterLight = charLightObj.AddComponent<Light2D>();
             ApplyScreenshotSettingsToLight(characterLight);
+            charLightObj.SetActive(true);
         }
         else
         {
@@ -473,7 +475,7 @@ public class PlayerMovement : MonoBehaviour
         }
     }
 
-    private void UpdateCharacterLight()
+    public void UpdateCharacterLight()
     {
         if (characterLight == null) return;
 

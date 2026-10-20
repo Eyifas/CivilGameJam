@@ -175,6 +175,14 @@ public class ApartmentExitDoor : MonoBehaviour
 
         if (!playerInside) return;
 
+        var playerObj = GameObject.FindWithTag("Player");
+        if (playerObj != null && Vector2.Distance(playerObj.transform.position, transform.position) > 4.5f)
+        {
+            playerInside = false;
+            UpdatePromptVisibility();
+            return;
+        }
+
         UpdatePromptVisibility();
 
         var timeline = GameTimelineManager.Instance;
@@ -236,6 +244,7 @@ public class ApartmentExitDoor : MonoBehaviour
                 PlayerMovement.SavePosition(player.transform.position);
             }
 
+            timeline.RecordActionSnapshot("Reached Exit Door - Ready to Unlock");
             AudioManager.PlayDoorLocked();
             Debug.Log("<color=cyan>[ExitDoor] Opening DoorScene to unlock the front door!</color>");
             UnityEngine.SceneManagement.SceneManager.LoadScene("DoorScene");

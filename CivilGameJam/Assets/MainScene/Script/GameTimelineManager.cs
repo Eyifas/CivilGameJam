@@ -138,6 +138,8 @@ public class GameTimelineManager : MonoBehaviour
     public event Action<GameStage> OnStageChanged;
     public event Action OnStateUpdated;
 
+    public bool IsRestartingMainScene { get; private set; } = false;
+
     private bool hasStarted = false;
 
     private void Awake()
@@ -179,6 +181,11 @@ public class GameTimelineManager : MonoBehaviour
             else if (currentStage == GameStage.Stage1_Preparation)
             {
                 ReEnableStage1Interactions();
+                var lightCtrl = EarthquakeLightController.Instance ?? FindFirstObjectByType<EarthquakeLightController>();
+                if (lightCtrl != null)
+                {
+                    lightCtrl.ApplyNormalLighting();
+                }
             }
         }
     }
@@ -225,6 +232,7 @@ public class GameTimelineManager : MonoBehaviour
                 {
                     msd = dolap.AddComponent<MainSceneDolap>();
                 }
+                dolap.transform.position = new Vector3(MainSceneDolap.ExpectedDolapX, MainSceneDolap.ExpectedDolapY, dolap.transform.position.z);
                 msd.SyncToTimelineState();
             }
         }
@@ -341,6 +349,11 @@ public class GameTimelineManager : MonoBehaviour
             currentStageTimer -= Time.deltaTime;
             currentStageTimer = Mathf.Max(0f, currentStageTimer);
 
+            if (currentStage == GameStage.Stage1_Preparation && !isStage1EarlyTriggered)
+            {
+                CheckStage1EarlyCompletion();
+            }
+
             UpdateTimerHUD();
 
             if (currentStageTimer <= 0f)
@@ -421,12 +434,25 @@ public class GameTimelineManager : MonoBehaviour
         currentStage = GameStage.Stage1_Preparation;
         currentStageTimer = stage1Duration;
         isTimerRunning = true;
+        isStage1EarlyTriggered = false;
 
         EnsureTimerTextReference();
         SetHUDVisibility(true);
         UpdateTimerHUD();
 
-        if (playerMovement != null) playerMovement.enabled = true;
+        var lightCtrl = EarthquakeLightController.Instance ?? FindFirstObjectByType<EarthquakeLightController>();
+        if (lightCtrl != null)
+        {
+            lightCtrl.ApplyNormalLighting();
+        }
+
+        if (playerMovement == null) playerMovement = FindFirstObjectByType<PlayerMovement>();
+        if (playerMovement != null)
+        {
+            playerMovement.enabled = true;
+            playerMovement.EnsureCharacterLight();
+            playerMovement.UpdateCharacterLight();
+        }
 
         if (actionHistory.Count == 0)
         {
@@ -443,11 +469,11 @@ public class GameTimelineManager : MonoBehaviour
 
     public void SetBookshelfAnchored(bool anchored)
     {
-        if (currentStage != GameStage.Rewinding && isBookshelfAnchored != anchored)
+        isBookshelfAnchored = anchored;
+        if (currentStage != GameStage.Rewinding)
         {
             RecordActionSnapshot($"Bookshelf Anchored: {anchored}");
         }
-        isBookshelfAnchored = anchored;
         Debug.Log($"[Timeline] Bookshelf Anchored: {anchored}");
         UpdateInventoryHUD();
         CheckStage1EarlyCompletion();
@@ -455,11 +481,11 @@ public class GameTimelineManager : MonoBehaviour
 
     public void SetPaintingRemoved(bool removed)
     {
-        if (currentStage != GameStage.Rewinding && isPaintingRemoved != removed)
+        isPaintingRemoved = removed;
+        if (currentStage != GameStage.Rewinding)
         {
             RecordActionSnapshot($"Painting Removed: {removed}");
         }
-        isPaintingRemoved = removed;
         Debug.Log($"[Timeline] Painting Removed: {removed}");
         UpdateInventoryHUD();
         CheckStage1EarlyCompletion();
@@ -468,11 +494,11 @@ public class GameTimelineManager : MonoBehaviour
 
     public void SetCandleExtinguished(bool extinguished)
     {
-        if (currentStage != GameStage.Rewinding && isCandleExtinguished != extinguished)
+        isCandleExtinguished = extinguished;
+        if (currentStage != GameStage.Rewinding)
         {
             RecordActionSnapshot($"Candle Extinguished: {extinguished}");
         }
-        isCandleExtinguished = extinguished;
         Debug.Log($"[Timeline] Candle Extinguished: {extinguished}");
         UpdateInventoryHUD();
         CheckStage1EarlyCompletion();
@@ -503,12 +529,25 @@ public class GameTimelineManager : MonoBehaviour
         CheckStage1EarlyCompletion();
     }
 
-    private void CheckStage1EarlyCompletion()
+    [SerializeField] private bool isStage1EarlyTriggered = false;
+
+    public void CheckStage1EarlyCompletion()
     {
-        // If player finished all 5 Stage 1 tasks early
-        if (isBookshelfAnchored && isPaintingRemoved && isCandleExtinguished && hasFlashlight && hasFirstAidKit)
+        if (isStage1EarlyTriggered || currentStage != GameStage.Stage1_Preparation) return;
+
+        bool isBookshelfDone = isBookshelfAnchored;
+        bool isHazardsDone = isPaintingRemoved && isCandleExtinguished;
+        bool isLookAroundDone = TodoListUI.IsLookAroundDone;
+        bool hasAllDrawerItems = TodoListUI.HasAllDrawerItems();
+
+        // If player finished all Stage 1 tasks early (including gathering all items in the drawers),
+        // accelerate earthquake timer to min(3s, remaining time)
+        if (isBookshelfDone && isHazardsDone && isLookAroundDone && hasAllDrawerItems)
         {
-            Debug.Log("[Timeline] All Stage 1 preparations complete! Early trigger ready if needed.");
+            isStage1EarlyTriggered = true;
+            currentStageTimer = Mathf.Min(currentStageTimer, 3.0f);
+            UpdateTimerHUD();
+            Debug.Log($"<color=cyan>[Timeline] All Stage 1 tasks finished early (including all drawer items)! Earthquake will strike in {currentStageTimer:0.0}s.</color>");
         }
     }
 
@@ -529,16 +568,43 @@ public class GameTimelineManager : MonoBehaviour
         Debug.Log("[Timeline] STAGE 2: Destructive S-waves strike!");
         SetObjectiveText("EARTHQUAKE STRIKES! MAKE YOUR DECISION!");
 
-        // Start violent screen shake
-        if (roomCamera != null)
-        {
-            roomCamera.StartEarthquake();
-        }
-
-        // Freeze player movement so they make their choice
+        // If player is in another room (e.g. Room 0: Kitchen or Room 2: Hallway),
+        // teleport them back to the start position in Room 1 so they can see the results of their actions.
+        if (playerMovement == null) playerMovement = FindFirstObjectByType<PlayerMovement>();
         if (playerMovement != null)
         {
+            const float roomWidth = 19.2f;
+            const float leftEdge = -38.4f;
+            int currentRoom = Mathf.FloorToInt((playerMovement.transform.position.x - leftEdge) / roomWidth);
+            currentRoom = Mathf.Clamp(currentRoom, 0, 2);
+
+            if (currentRoom != 1)
+            {
+                Vector3 startPos = new Vector3(-9.6f, -2.2f, 0f);
+                playerMovement.transform.position = startPos;
+                PlayerMovement.ClearSavedPosition();
+                var rb = playerMovement.GetComponent<Rigidbody2D>();
+                if (rb != null)
+                {
+                    rb.linearVelocity = Vector2.zero;
+                    rb.position = startPos;
+                }
+                Debug.Log($"<color=cyan>[Timeline] Player was in Room {currentRoom} when earthquake struck. Teleported back to start position {startPos} in Room 1.</color>");
+            }
+
+            // Freeze player movement so they make their choice
             playerMovement.enabled = false;
+        }
+
+        // Start violent screen shake & snap camera to Room 1
+        if (roomCamera == null) roomCamera = FindFirstObjectByType<RoomCamera>();
+        if (roomCamera != null)
+        {
+            if (playerMovement != null) roomCamera.player = playerMovement.transform;
+            float cameraX = -38.4f + 19.2f * (1 + 0.5f); // Room 1 center (-9.6f)
+            Vector3 camPos = roomCamera.transform.position;
+            roomCamera.transform.position = new Vector3(cameraX, camPos.y, camPos.z);
+            roomCamera.StartEarthquake();
         }
 
         // Cancel any active QTE (e.g. if player was anchoring bookshelf when earthquake struck)
@@ -870,7 +936,7 @@ public class GameTimelineManager : MonoBehaviour
         var lightCtrl = EarthquakeLightController.Instance ?? FindFirstObjectByType<EarthquakeLightController>();
         if (lightCtrl != null)
         {
-            lightCtrl.SetCustomControlled(false);
+            lightCtrl.ApplyNormalLighting();
         }
     }
 
@@ -901,12 +967,12 @@ public class GameTimelineManager : MonoBehaviour
 
     public void HandleCabinetQTEResult(bool success)
     {
+        isCabinetSecured = success;
         if (currentStage != GameStage.Rewinding)
         {
             RecordActionSnapshot($"Cabinet QTE: {success}");
         }
 
-        isCabinetSecured = success;
         if (success)
         {
             Debug.Log("<color=green>[Timeline] Kitchen cabinet secured safely!</color>");
@@ -919,12 +985,12 @@ public class GameTimelineManager : MonoBehaviour
 
     public void HandleDolapQTEResult(bool success)
     {
+        isDolapSecured = success;
         if (currentStage != GameStage.Rewinding)
         {
             RecordActionSnapshot($"Hallway Dolap QTE: {success}");
         }
 
-        isDolapSecured = success;
         if (success)
         {
             Debug.Log("<color=green>[Timeline] Hallway wardrobe safely lifted and placed upright!</color>");
@@ -1235,6 +1301,12 @@ public class GameTimelineManager : MonoBehaviour
         if (roomCamera != null) roomCamera.StopEarthquake();
         if (stage2ChoiceGroup != null) stage2ChoiceGroup.gameObject.SetActive(false);
 
+        if (HazardVisualManager.Instance != null)
+        {
+            HazardVisualManager.Instance.Hide();
+        }
+        SwitchInteraction.ResetAllHazardStates();
+
         EnsureTimeRewindController();
         TimeRewindController.Instance.PlayGameOverSequence(
             educationalReason: educationalReason,
@@ -1256,24 +1328,41 @@ public class GameTimelineManager : MonoBehaviour
 
     private void UndoLastFatalActionAndRestore(GameStage failedStage, string educationalReason, float addedDuration)
     {
-        // If the player failed while inside a sub-scene (like CupboardScene), load MainScene behind closed eyes
-        if (SceneManager.GetActiveScene().name != "MainScene")
+        bool isTimeout = educationalReason.IndexOf("TIME RAN OUT", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                         educationalReason.IndexOf("Lingered too long", StringComparison.OrdinalIgnoreCase) >= 0;
+
+        string currentScene = SceneManager.GetActiveScene().name;
+
+        // If the player failed inside DoorScene due to timeout, reload DoorScene with extra time so they can finish unlocking!
+        if (currentScene == "DoorScene" && isTimeout)
+        {
+            SceneManager.LoadScene("DoorScene");
+        }
+        else if (currentScene != "MainScene")
         {
             SceneManager.LoadScene("MainScene");
             RebindSceneReferences();
         }
 
+        // Cache completed states before restoring so timeouts NEVER regress completed progress
+        bool prevDolapSecured = isDolapSecured;
+        bool prevGasShutOff = isGasShutOff;
+        bool prevCabinetSecured = isCabinetSecured;
+        bool prevBookshelfAnchored = isBookshelfAnchored;
+        bool prevPaintingRemoved = isPaintingRemoved;
+        bool prevCandleExtinguished = isCandleExtinguished;
+
         // 1. Retrieve the snapshot before the last fatal action was performed
         TimelineSnapshot snapshot;
-        if (actionHistory.Count > 1)
+        if (!isTimeout && actionHistory.Count > 1)
         {
             snapshot = actionHistory.Pop();
             Debug.Log($"<color=yellow>[Timeline] Reverting last action '{snapshot.actionDescription}' as if it never happened!</color>");
         }
-        else if (actionHistory.Count == 1)
+        else if (actionHistory.Count >= 1)
         {
             snapshot = actionHistory.Peek();
-            Debug.Log($"<color=yellow>[Timeline] Restoring to initial baseline state '{snapshot.actionDescription}'</color>");
+            Debug.Log($"<color=yellow>[Timeline] Restoring to snapshot '{snapshot.actionDescription}' (Timeout: {isTimeout})</color>");
         }
         else
         {
@@ -1287,17 +1376,17 @@ public class GameTimelineManager : MonoBehaviour
             };
         }
 
-        // 2. Restore logical flags from snapshot
-        isBookshelfAnchored = snapshot.isBookshelfAnchored;
-        isPaintingRemoved = snapshot.isPaintingRemoved;
-        isCandleExtinguished = snapshot.isCandleExtinguished;
+        // 2. Restore logical flags from snapshot (preserving completed progress on timeout)
+        isBookshelfAnchored = snapshot.isBookshelfAnchored || (isTimeout && prevBookshelfAnchored);
+        isPaintingRemoved = snapshot.isPaintingRemoved || (isTimeout && prevPaintingRemoved);
+        isCandleExtinguished = snapshot.isCandleExtinguished || (isTimeout && prevCandleExtinguished);
         hasFlashlight = snapshot.hasFlashlight;
         PlayerMovement.SetFlashlightEquipped(snapshot.isFlashlightEquipped);
         hasFirstAidKit = snapshot.hasFirstAidKit;
 
-        isCabinetSecured = snapshot.isCabinetSecured;
-        isDolapSecured = snapshot.isDolapSecured;
-        isGasShutOff = snapshot.isGasShutOff;
+        isCabinetSecured = snapshot.isCabinetSecured || (isTimeout && prevCabinetSecured);
+        isDolapSecured = snapshot.isDolapSecured || (isTimeout && prevDolapSecured);
+        isGasShutOff = snapshot.isGasShutOff || (isTimeout && prevGasShutOff);
         isBreakerShutOff = snapshot.isBreakerShutOff;
         isElectricityRestored = snapshot.isElectricityRestored;
 
@@ -1359,11 +1448,14 @@ public class GameTimelineManager : MonoBehaviour
             currentStageTimer = Mathf.Max(snapshot.stageTimer + addedDuration, addedDuration);
             isTimerRunning = true;
             stage2TremorDuration = 5f;
+            isStage1EarlyTriggered = false;
 
             CleanupDeskCoverState();
-            if (roomCamera != null)
+
+            var lightCtrl = EarthquakeLightController.Instance ?? FindFirstObjectByType<EarthquakeLightController>();
+            if (lightCtrl != null)
             {
-                roomCamera.StopEarthquake();
+                lightCtrl.ApplyNormalLighting();
             }
 
             if (stage2ChoiceGroup != null)
@@ -1389,13 +1481,30 @@ public class GameTimelineManager : MonoBehaviour
                     ? snapshot.playerPosition
                     : new Vector3(-9.6f, -2.2f, 0f);
             }
+
+            if (roomCamera != null)
+            {
+                if (playerMovement != null) roomCamera.player = playerMovement.transform;
+                roomCamera.StopEarthquake();
+            }
         }
         else if (failedStage == GameStage.Stage3_Utilities)
         {
             currentStage = GameStage.Stage3_Utilities;
             currentStageTimer = Mathf.Max(snapshot.stageTimer + addedDuration, addedDuration);
             isTimerRunning = true;
-            SetObjectiveText($"STAGE 3 (+{addedDuration:0}s): Gas leak detected! Secure cabinet & shut off utilities safely.");
+            if (isGasShutOff && isDolapSecured)
+            {
+                SetObjectiveText($"STAGE 3 (+{addedDuration:0}s): Unlock the exit door and evacuate!");
+            }
+            else if (isGasShutOff)
+            {
+                SetObjectiveText($"STAGE 3 (+{addedDuration:0}s): Clear the hallway and reach the exit door!");
+            }
+            else
+            {
+                SetObjectiveText($"STAGE 3 (+{addedDuration:0}s): Gas leak detected! Secure cabinet & shut off utilities safely.");
+            }
 
             if (playerMovement != null)
             {
@@ -1441,14 +1550,14 @@ public class GameTimelineManager : MonoBehaviour
         var zones = FindObjectsByType<InteractionZone>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         foreach (var z in zones)
         {
-            // Kitchen pipe zone must NOT be interactable in Stage 1!
-            if (z.IsPipeZone())
+            // Kitchen pipe zone and dolap zone must NOT be interactable in Stage 1!
+            if (z.IsPipeZone() || z.IsDolapZone())
             {
                 z.SetInteractable(false);
             }
             else
             {
-                z.SetInteractable(true);
+                z.SetInteractable(!z.IsZoneCompleted());
             }
         }
 
@@ -1469,13 +1578,23 @@ public class GameTimelineManager : MonoBehaviour
 
     public void EnableStage3Interactions()
     {
-        // 1. Enable Pipe InteractionZone in kitchen (if gas is not already shut off)
+        EnsureMainSceneDolap();
+
+        // 1. Enable Pipe, Dolap, and Drawer InteractionZones in Stage 3
         var zones = FindObjectsByType<InteractionZone>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         foreach (var z in zones)
         {
             if (z.IsPipeZone())
             {
                 z.SetInteractable(!isGasShutOff);
+            }
+            else if (z.IsDolapZone())
+            {
+                z.SetInteractable(!isDolapSecured);
+            }
+            else if (z.IsDrawerZone())
+            {
+                z.SetInteractable(!TodoListUI.HasAllDrawerItems());
             }
             else
             {
@@ -1505,12 +1624,15 @@ public class GameTimelineManager : MonoBehaviour
 
     public void ResetToCheckpoint()
     {
+        IsRestartingMainScene = true;
+
         // Reset time loop counters & history
         rewindsUsed = 0;
         actionHistory.Clear();
         stage2TremorDuration = 5f;
 
         // Reset flags
+        isStage1EarlyTriggered = false;
         isBookshelfAnchored = false;
         isPaintingRemoved = false;
         isCandleExtinguished = false;
@@ -1526,6 +1648,10 @@ public class GameTimelineManager : MonoBehaviour
         InventoryManager.ResetInventory();
         PlayerMovement.ClearSavedPosition();
         PlayerMovement.SetFlashlightEquipped(false);
+        if (HazardVisualManager.Instance != null)
+        {
+            HazardVisualManager.Instance.Hide();
+        }
         SwitchInteraction.ResetAllHazardStates();
         TodoListUI.ResetExplorationState();
 
@@ -1537,7 +1663,14 @@ public class GameTimelineManager : MonoBehaviour
 
     private IEnumerator RestartMainSceneRoutine()
     {
+        IsRestartingMainScene = true;
         Time.timeScale = 1f;
+
+        if (HazardVisualManager.Instance != null)
+        {
+            HazardVisualManager.Instance.Hide();
+        }
+        SwitchInteraction.ResetAllHazardStates();
 
         var op = SceneManager.LoadSceneAsync("MainScene");
         while (!op.isDone)
@@ -1551,6 +1684,34 @@ public class GameTimelineManager : MonoBehaviour
         EnsureTimerTextReference();
         SetHUDVisibility(true);
         CleanupDeskCoverState();
+
+        // Extra cleanup: hide any lingering hazard illustrations or backdrops
+        if (HazardVisualManager.Instance != null)
+        {
+            HazardVisualManager.Instance.Hide();
+        }
+        SwitchInteraction.ResetAllHazardStates();
+
+        var strayDeath = GameObject.Find("1000000106_0");
+        if (strayDeath != null)
+        {
+            strayDeath.SetActive(false);
+        }
+
+        var allRenderers = FindObjectsByType<SpriteRenderer>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        foreach (var sr in allRenderers)
+        {
+            if (sr != null && sr.name == "Backdrop" && sr.transform.parent != null && (sr.transform.parent.name == "Visual" || sr.transform.parent.name == "1000000106_0"))
+            {
+                sr.gameObject.SetActive(false);
+            }
+        }
+
+        var lightCtrl = EarthquakeLightController.Instance ?? FindFirstObjectByType<EarthquakeLightController>();
+        if (lightCtrl != null)
+        {
+            lightCtrl.ApplyNormalLighting();
+        }
 
         if (playerMovement == null) playerMovement = FindFirstObjectByType<PlayerMovement>();
         if (playerMovement != null)
@@ -1571,6 +1732,8 @@ public class GameTimelineManager : MonoBehaviour
         SetHUDVisibility(true);
         UpdateTimerHUD();
         OnStateUpdated?.Invoke();
+
+        IsRestartingMainScene = false;
 
         Debug.Log("<color=green>[Timeline] Successfully restarted run into fresh MainScene Stage 1 with top-right timer!</color>");
     }
@@ -1797,6 +1960,12 @@ public class GameTimelineManager : MonoBehaviour
 
     public void SetHUDVisibility(bool visible)
     {
+        string currentScene = SceneManager.GetActiveScene().name;
+        if (currentScene == "EndScene" || currentScene == "StartScene")
+        {
+            visible = false;
+        }
+
         if (visible)
         {
             EnsureTimerTextReference();
@@ -1821,11 +1990,19 @@ public class GameTimelineManager : MonoBehaviour
         }
         if (PersistentCanvas.Instance != null)
         {
-            var c = PersistentCanvas.Instance.GetComponent<Canvas>();
-            if (c != null)
+            if (currentScene == "EndScene" || currentScene == "StartScene" || !visible)
             {
-                c.enabled = visible;
-                if (visible && c.sortingOrder < 100) c.sortingOrder = 100;
+                PersistentCanvas.Instance.gameObject.SetActive(visible);
+            }
+            else
+            {
+                PersistentCanvas.Instance.gameObject.SetActive(true);
+                var c = PersistentCanvas.Instance.GetComponent<Canvas>();
+                if (c != null)
+                {
+                    c.enabled = true;
+                    if (c.sortingOrder < 100) c.sortingOrder = 100;
+                }
             }
         }
     }
@@ -1845,8 +2022,8 @@ public class GameTimelineManager : MonoBehaviour
     public void HandleGasValveShutOff()
     {
         if (isGasShutOff) return;
-        RecordActionSnapshot("Gas Valve Closed (Semicircle Turn)");
         isGasShutOff = true;
+        RecordActionSnapshot("Gas Valve Closed (Semicircle Turn)");
         Debug.Log("<color=green>[Timeline] Gas valve safely turned shut via QTE!</color>");
 
         // Disable pipe zone once gas is shut off
@@ -1871,7 +2048,19 @@ public class GameTimelineManager : MonoBehaviour
         if (playerMovement != null) playerMovement.ResetFlashlight();
         OnStageChanged?.Invoke(currentStage);
 
-       SceneManager.LoadScene("EndScene");    }
+        SetHUDVisibility(false);
+        if (PersistentCanvas.Instance != null)
+        {
+            PersistentCanvas.Instance.gameObject.SetActive(false);
+        }
+        var hudCanvas = GameObject.Find("HUDCanvas");
+        if (hudCanvas != null)
+        {
+            hudCanvas.SetActive(false);
+        }
+
+        SceneManager.LoadScene("EndScene");
+    }
 
     public void ShowUrgentMessage(string msg)
     {

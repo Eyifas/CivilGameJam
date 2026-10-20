@@ -171,6 +171,16 @@ public class DoorSceneController : MonoBehaviour
         {
             Instance = null;
         }
+        if (dragKeyCue != null)
+        {
+            if (dragKeyCue.gameObject != null) Destroy(dragKeyCue.gameObject);
+            dragKeyCue = null;
+        }
+        if (turnKeyCue != null)
+        {
+            if (turnKeyCue.gameObject != null) Destroy(turnKeyCue.gameObject);
+            turnKeyCue = null;
+        }
     }
 
     private void LoadSprites()

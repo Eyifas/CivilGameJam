@@ -43,6 +43,8 @@ public static class InventoryManager
                 {
                     GameTimelineManager.Instance.CollectFirstAidKit();
                 }
+
+                GameTimelineManager.Instance.CheckStage1EarlyCompletion();
             }
         }
     }

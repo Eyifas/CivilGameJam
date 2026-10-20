@@ -15,13 +15,14 @@ public class EndSceneController : MonoBehaviour
     private int currentStoryIndex = 0;
     private bool storyFinished = false;
 
+    private void Awake()
+    {
+        HideAllGameplayUI();
+    }
+
     private void Start()
     {
-        // EndScene'e gelince oyun timerı artık çalışmasın
-        if (GameTimelineManager.Instance != null)
-        {
-            GameTimelineManager.Instance.enabled = false;
-        }
+        HideAllGameplayUI();
 
         // Story görselleri varsa ilkini göster
         if (storySprites != null && storySprites.Length > 0)
@@ -39,6 +40,55 @@ public class EndSceneController : MonoBehaviour
         else
         {
             ReplayGame();
+        }
+    }
+
+    private void HideAllGameplayUI()
+    {
+        if (GameTimelineManager.Instance != null)
+        {
+            GameTimelineManager.Instance.PauseTimer();
+            GameTimelineManager.Instance.SetHUDVisibility(false);
+            GameTimelineManager.Instance.enabled = false;
+        }
+
+        if (PersistentCanvas.Instance != null)
+        {
+            PersistentCanvas.Instance.gameObject.SetActive(false);
+        }
+
+        var inventoryUI = FindFirstObjectByType<InventoryUI>(FindObjectsInactive.Include);
+        if (inventoryUI != null)
+        {
+            inventoryUI.gameObject.SetActive(false);
+        }
+
+        var hudCanvas = GameObject.Find("HUDCanvas");
+        if (hudCanvas != null)
+        {
+            hudCanvas.SetActive(false);
+        }
+
+        var proceduralTimer = GameObject.Find("ProceduralTimerText");
+        if (proceduralTimer != null)
+        {
+            proceduralTimer.SetActive(false);
+        }
+
+        var firstTime = GameObject.Find("FirstTime");
+        if (firstTime != null)
+        {
+            firstTime.SetActive(false);
+        }
+
+        // Deactivate all persistent canvases from previous scenes
+        var canvases = FindObjectsByType<Canvas>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        foreach (var c in canvases)
+        {
+            if (c.gameObject.scene.name != "EndScene")
+            {
+                c.gameObject.SetActive(false);
+            }
         }
     }
 
